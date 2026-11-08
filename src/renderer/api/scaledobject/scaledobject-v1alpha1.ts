@@ -94,6 +94,36 @@ export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
     return `${ScaledObject.getScaleTargetKind(object)}/${object.spec.scaleTargetRef.name}`;
   }
 
+  /**
+   * The workload the object scales, as a reference for a link to it. The
+   * controller resolves its group and version into the status
+   * (`scaleTargetGVKR`); until then they are the apiVersion of the spec, or
+   * `apps/v1`, the controller's default when the spec omits it. The host's
+   * link needs the apiVersion: it looks the API up by kind and apiVersion, and
+   * without one makes up a link under `v1`, where no workload is.
+   */
+  static getScaleTargetRef(object: ScaledObject): Renderer.K8sApi.ObjectReference {
+    const gvkr = object.status?.scaleTargetGVKR;
+
+    return {
+      kind: ScaledObject.getScaleTargetKind(object),
+      name: object.spec.scaleTargetRef.name,
+      apiVersion: gvkr
+        ? [gvkr.group, gvkr.version].filter(Boolean).join("/")
+        : (object.spec.scaleTargetRef.apiVersion ?? "apps/v1"),
+    };
+  }
+
+  /**
+   * The HorizontalPodAutoscaler the controller created for the object, as a
+   * reference for a link to it, once the controller has written its name into
+   * the status.
+   */
+  static getHpaRef(object: ScaledObject): Renderer.K8sApi.ObjectReference | undefined {
+    const name = object.status?.hpaName;
+    return name ? { kind: "HorizontalPodAutoscaler", apiVersion: "autoscaling/v2", name } : undefined;
+  }
+
   static getMin(object: ScaledObject): number | undefined {
     return object.spec.minReplicaCount;
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ClusterTriggerAuthentication } from "./clustertriggerauthentication/clustertriggerauthentication-v1alpha1";
 import {
+  getAuthenticationObjectRef,
   getAuthParameters,
   getEnvNames,
   getPodIdentityProvider,
@@ -105,5 +106,23 @@ describe("getAuthParameters", () => {
 
   it("is empty for an authentication through pod identity alone", () => {
     expect(getAuthParameters(buildTriggerAuthentication({ podIdentity: { provider: "azure-workload" } }))).toEqual([]);
+  });
+});
+
+describe("getAuthenticationObjectRef", () => {
+  it("refers to a TriggerAuthentication when the trigger names no kind, as the controller does", () => {
+    expect(getAuthenticationObjectRef({ name: "example-auth" })).toEqual({
+      kind: "TriggerAuthentication",
+      apiVersion: "keda.sh/v1alpha1",
+      name: "example-auth",
+    });
+  });
+
+  it("refers to a ClusterTriggerAuthentication by its kind", () => {
+    expect(getAuthenticationObjectRef({ name: "example-cluster-auth", kind: "ClusterTriggerAuthentication" })).toEqual({
+      kind: "ClusterTriggerAuthentication",
+      apiVersion: "keda.sh/v1alpha1",
+      name: "example-cluster-auth",
+    });
   });
 });

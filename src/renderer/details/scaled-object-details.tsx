@@ -7,7 +7,7 @@ import { Triggers } from "./triggers";
 const { observer } = MobxReact;
 
 const {
-  Component: { Badge, DrawerItem },
+  Component: { Badge, DrawerItem, LinkToObject },
 } = Renderer;
 
 export type ScaledObjectDetailsProps = Renderer.Component.KubeObjectDetailsProps<ScaledObject>;
@@ -26,12 +26,19 @@ function conditionClass(status: string): string {
 export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProps) => {
   const conditions = object.status?.conditions;
   const fallback = object.spec.fallback;
+  const hpaRef = ScaledObject.getHpaRef(object);
 
   return (
     <>
       <DrawerItem name="Scale Target">
-        {ScaledObject.getScaleTarget(object)}
-        {object.spec.scaleTargetRef.apiVersion ? ` (${object.spec.scaleTargetRef.apiVersion})` : ""}
+        <LinkToObject
+          object={object}
+          objectRef={ScaledObject.getScaleTargetRef(object)}
+          content={ScaledObject.getScaleTarget(object)}
+        />
+      </DrawerItem>
+      <DrawerItem name="Horizontal Pod Autoscaler" hidden={!hpaRef}>
+        <LinkToObject object={object} objectRef={hpaRef} />
       </DrawerItem>
       <DrawerItem name="Min Replicas">{object.spec.minReplicaCount ?? "-"}</DrawerItem>
       <DrawerItem name="Max Replicas">{object.spec.maxReplicaCount ?? "-"}</DrawerItem>
@@ -50,7 +57,7 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
           ? String(object.spec.advanced.restoreToOriginalReplicaCount)
           : "-"}
       </DrawerItem>
-      <Triggers triggers={object.spec.triggers ?? []} />
+      <Triggers object={object} triggers={object.spec.triggers ?? []} />
       <DrawerItem name="Fallback">
         {fallback
           ? `enabled (failureThreshold: ${fallback.failureThreshold}, replicas: ${fallback.replicas})`

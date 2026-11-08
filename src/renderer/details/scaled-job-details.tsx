@@ -60,7 +60,7 @@ export const ScaledJobDetails = observer(({ object }: ScaledJobDetailsProps) => 
       <DrawerItem name="Env Source Container" hidden={!spec.envSourceContainerName}>
         {spec.envSourceContainerName}
       </DrawerItem>
-      <Triggers triggers={spec.triggers ?? []} />
+      <Triggers object={object} triggers={spec.triggers ?? []} />
       <DrawerItem name="External Metric Names">{ScaledJob.getExternalMetricNames(object).join(", ") || "-"}</DrawerItem>
       <DrawerItem name="Last Active Time">{object.status?.lastActiveTime ?? "-"}</DrawerItem>
       <ScalingEvents object={object} />

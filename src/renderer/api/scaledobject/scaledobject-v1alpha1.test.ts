@@ -230,6 +230,78 @@ describe("ScaledObject (v1alpha1)", () => {
     });
   });
 
+  describe("getScaleTargetRef", () => {
+    it("refers to the workload by the group and version the controller resolved", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        {
+          scaleTargetKind: "apps/v1.Deployment",
+          scaleTargetGVKR: { group: "apps", version: "v1", kind: "Deployment", resource: "deployments" },
+        },
+      );
+      expect(ScaledObject.getScaleTargetRef(object)).toEqual({
+        kind: "Deployment",
+        name: "example-app",
+        apiVersion: "apps/v1",
+      });
+    });
+
+    it("leaves the empty group of a core kind out of the apiVersion", () => {
+      const object = buildScaledObject(
+        {
+          scaleTargetRef: { name: "example-rc", kind: "ReplicationController" },
+          triggers: [{ type: "cpu", metadata: {} }],
+        },
+        {
+          scaleTargetGVKR: {
+            group: "",
+            version: "v1",
+            kind: "ReplicationController",
+            resource: "replicationcontrollers",
+          },
+        },
+      );
+      expect(ScaledObject.getScaleTargetRef(object).apiVersion).toBe("v1");
+    });
+
+    it("takes the apiVersion of the spec before the controller has resolved it, or the default apps/v1", () => {
+      const rollout = buildScaledObject({
+        scaleTargetRef: { name: "example-app", apiVersion: "argoproj.io/v1alpha1", kind: "Rollout" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      const deployment = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      expect(ScaledObject.getScaleTargetRef(rollout)).toEqual({
+        kind: "Rollout",
+        name: "example-app",
+        apiVersion: "argoproj.io/v1alpha1",
+      });
+      expect(ScaledObject.getScaleTargetRef(deployment)).toEqual({
+        kind: "Deployment",
+        name: "example-app",
+        apiVersion: "apps/v1",
+      });
+    });
+  });
+
+  describe("getHpaRef", () => {
+    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] };
+
+    it("refers to the HPA the controller named in the status", () => {
+      expect(ScaledObject.getHpaRef(buildScaledObject(spec, { hpaName: "keda-hpa-example-app-cpu" }))).toEqual({
+        kind: "HorizontalPodAutoscaler",
+        apiVersion: "autoscaling/v2",
+        name: "keda-hpa-example-app-cpu",
+      });
+    });
+
+    it("is undefined until the controller has created the HPA", () => {
+      expect(ScaledObject.getHpaRef(buildScaledObject(spec))).toBeUndefined();
+    });
+  });
+
   describe("status list normalization", () => {
     it("splits string authentication types and metric names", () => {
       const object = buildScaledObject(

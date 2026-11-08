@@ -349,7 +349,11 @@ from the Custom Resources tree.
   `objectRef` of its kind, name and apiVersion and the object of the panel,
   whose namespace it takes: the host finds the API of the kind, one of its own
   or one it registered for a CRD, and links to the details of the object.
-  Nothing loads another store for a link. A ClusterTriggerAuthentication names
+  Nothing loads another store for a link. The ScaledObject panel links its
+  scale target (`getScaleTargetRef`, with the group and version the controller
+  resolves into `status.scaleTargetGVKR`) and its HPA (`getHpaRef`, from
+  `status.hpaName`), and `Triggers` links the authentication of each trigger
+  (`getAuthenticationObjectRef`). A ClusterTriggerAuthentication names
   Secrets in the namespace of the operator, which the object does not say, and
   is used by objects in any namespace, so its panel shows those names as text.
 - `Renderer.Component.ConfirmDialog` lays its content out as flex items, so its

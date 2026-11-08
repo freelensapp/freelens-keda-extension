@@ -1,5 +1,8 @@
+import type { Renderer } from "@freelensapp/extensions";
+
 import type { ClusterTriggerAuthentication } from "./clustertriggerauthentication/clustertriggerauthentication-v1alpha1";
 import type { TriggerAuthentication } from "./triggerauthentication/triggerauthentication-v1alpha1";
+import type { AuthenticationRef } from "./types";
 
 // TriggerAuthentication and ClusterTriggerAuthentication share their spec and
 // status, so their per-object logic is here, for either kind, and the pages and
@@ -14,6 +17,15 @@ const splitNames = (value: string | undefined) =>
     ?.split(",")
     .map((name) => name.trim())
     .filter(Boolean) ?? [];
+
+/**
+ * The authentication a trigger refers to, as a reference for a link to it: a
+ * TriggerAuthentication in the namespace of the trigger, the controller's
+ * default, or a ClusterTriggerAuthentication.
+ */
+export function getAuthenticationObjectRef(ref: AuthenticationRef): Renderer.K8sApi.ObjectReference {
+  return { kind: ref.kind ?? "TriggerAuthentication", apiVersion: "keda.sh/v1alpha1", name: ref.name };
+}
 
 /** The PODIDENTITY column of `kubectl get ta`. */
 export function getPodIdentityProvider(object: AnyTriggerAuthentication): string | undefined {

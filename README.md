@@ -40,7 +40,8 @@ message.
 Each resource also gets a details panel in the drawer, next to what the host shows for any
 custom resource (the printer columns of its CRD, its conditions and its events):
 
-- **ScaledObject**: scale target (`kind/name` + apiVersion), min/max replicas, polling
+- **ScaledObject**: links to the workload it scales and to the HorizontalPodAutoscaler the
+  controller created for it, min/max replicas, polling
   interval, cooldown period, idle replica count, initial cooldown period, `advanced` options,
   fallback, conditions, external metric names, original replica count, last active time and
   the pause state.
@@ -48,7 +49,8 @@ custom resource (the printer columns of its CRD, its conditions and its events):
   history limits, the rollout and scaling strategies, external metric names and last active
   time.
 - **Triggers**, for both: one section per scaler, with its type as a badge, its name, its
-  metric type, its metadata as key/value sub-items and its authentication ref.
+  metric type, its metadata as key/value sub-items and a link to its TriggerAuthentication or
+  ClusterTriggerAuthentication.
 - **Scaling Events**, for both: the events the cluster records for the object (KEDA writes one
   per scaling decision), read from the host's event store and shown as a table — Type,
   Reason, Message, Count and Last Seen — newest first, up to 20. Last Seen and Count read
