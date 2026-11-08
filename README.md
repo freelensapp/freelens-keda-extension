@@ -31,6 +31,11 @@ Four cluster pages, one per KEDA resource, grouped under a **KEDA** sidebar entr
 - **Cluster Trigger Authentications** (`cta`) — the same without Namespace, with the File
   Path, from `kubectl get cta -o wide`.
 
+Every list has a column menu, which hides and shows columns and keeps the choice per list.
+So that a list fits a narrow window, some columns start hidden: Ready, Active and Fallback,
+which Status sums up, and the objects that use an authentication, which `kubectl get` shows
+with `-o wide` only.
+
 Status sums up the conditions of a ScaledObject or a ScaledJob as a colored badge
 (`success` / `error` / `warning` / `info`) with the controller's reason
 (`ScaledObjectReady`, `ScaledObjectCheckFailed`, `Paused`, `Fallback`, `Active`, ...).

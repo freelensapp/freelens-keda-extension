@@ -57,6 +57,13 @@ const headers: Record<ColumnId, { title: string; sortBy: ColumnId; className?: s
   age: { title: "Age", sortBy: "age", className: styles.age },
 };
 
+// The column menu of the table hides and shows the columns, by their ids, and the host keeps the choice per table.
+// The objects that use an authentication start hidden, as `kubectl get` shows them with `-o wide` only, so the list
+// fits a narrow window.
+const defaultHiddenTableColumns: ColumnId[] = ["scaledObjects", "scaledJobs"];
+
+const header = (id: ColumnId) => ({ ...headers[id], id });
+
 const cells = (object: AnyTriggerAuthentication): Record<ColumnId, JSX.Element | string> => ({
   name: <WithTooltip>{object.getName()}</WithTooltip>,
   namespace: <LinkToNamespace namespace={object.getNs()} />,
@@ -101,10 +108,12 @@ export const TriggerAuthenticationsPage = observer(() => (
     tableId={`${TriggerAuthentication.crd.plural}Table`}
     className={styles.page}
     store={TriggerAuthentication.getStore<TriggerAuthentication>()}
+    isConfigurable
+    defaultHiddenTableColumns={defaultHiddenTableColumns}
     sortingCallbacks={sortingCallbacks}
     searchFilters={[(object: TriggerAuthentication) => object.getSearchFields()]}
     renderHeaderTitle={TriggerAuthentication.crd.title}
-    renderTableHeader={triggerAuthenticationColumns.map((id) => headers[id])}
+    renderTableHeader={triggerAuthenticationColumns.map(header)}
     renderTableContents={(object: TriggerAuthentication) => {
       const cell = cells(object);
       return triggerAuthenticationColumns.map((id) => cell[id]);
@@ -117,10 +126,12 @@ export const ClusterTriggerAuthenticationsPage = observer(() => (
     tableId={`${ClusterTriggerAuthentication.crd.plural}Table`}
     className={styles.page}
     store={ClusterTriggerAuthentication.getStore<ClusterTriggerAuthentication>()}
+    isConfigurable
+    defaultHiddenTableColumns={defaultHiddenTableColumns}
     sortingCallbacks={sortingCallbacks}
     searchFilters={[(object: ClusterTriggerAuthentication) => object.getSearchFields()]}
     renderHeaderTitle={ClusterTriggerAuthentication.crd.title}
-    renderTableHeader={clusterTriggerAuthenticationColumns.map((id) => headers[id])}
+    renderTableHeader={clusterTriggerAuthenticationColumns.map(header)}
     renderTableContents={(object: ClusterTriggerAuthentication) => {
       const cell = cells(object);
       return clusterTriggerAuthenticationColumns.map((id) => cell[id]);

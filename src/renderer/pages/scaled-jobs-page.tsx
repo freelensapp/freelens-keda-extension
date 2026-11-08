@@ -25,17 +25,23 @@ const sortingCallbacks = {
   age: (object: KubeObject) => object.getCreationTimestamp(),
 };
 
-const renderTableHeader: { title: string; sortBy: keyof typeof sortingCallbacks; className?: string }[] = [
-  { title: "Name", sortBy: "name" },
-  { title: "Namespace", sortBy: "namespace" },
-  { title: "Min", sortBy: "min", className: styles.min },
-  { title: "Max", sortBy: "max", className: styles.max },
-  { title: "Triggers", sortBy: "triggers", className: styles.triggers },
-  { title: "Status", sortBy: "status", className: styles.status },
-  { title: "Ready", sortBy: "ready", className: styles.ready },
-  { title: "Active", sortBy: "active", className: styles.active },
-  { title: "Age", sortBy: "age", className: styles.age },
-];
+const renderTableHeader = (
+  [
+    { title: "Name", sortBy: "name" },
+    { title: "Namespace", sortBy: "namespace" },
+    { title: "Min", sortBy: "min", className: styles.min },
+    { title: "Max", sortBy: "max", className: styles.max },
+    { title: "Triggers", sortBy: "triggers", className: styles.triggers },
+    { title: "Status", sortBy: "status", className: styles.status },
+    { title: "Ready", sortBy: "ready", className: styles.ready },
+    { title: "Active", sortBy: "active", className: styles.active },
+    { title: "Age", sortBy: "age", className: styles.age },
+  ] satisfies { title: string; sortBy: keyof typeof sortingCallbacks; className?: string }[]
+).map((header) => ({ ...header, id: header.sortBy }));
+
+// The column menu of the table hides and shows the columns, by their ids, and the host keeps the choice per table.
+// Ready and Active start hidden, as the Status column sums them up, so the list fits a narrow window.
+const defaultHiddenTableColumns: (keyof typeof sortingCallbacks)[] = ["ready", "active"];
 
 // The columns mirror `kubectl get sj`: MIN, MAX, READY, ACTIVE, TRIGGERS, with the conditions summed up in STATUS.
 export const ScaledJobsPage = observer(() => {
@@ -46,6 +52,8 @@ export const ScaledJobsPage = observer(() => {
       tableId={`${KubeObject.crd.plural}Table`}
       className={styles.page}
       store={store}
+      isConfigurable
+      defaultHiddenTableColumns={defaultHiddenTableColumns}
       sortingCallbacks={sortingCallbacks}
       searchFilters={[(object: KubeObject) => object.getSearchFields()]}
       renderHeaderTitle={KubeObject.crd.title}

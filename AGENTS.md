@@ -339,6 +339,12 @@ from the Custom Resources tree.
   included, and its Events section at the end. A field of a printer column
   comes back in a panel only as more than its value, such as the scale target
   as a link to the workload.
+- The list pages are configurable, as the host's own lists: every column has
+  an `id`, `isConfigurable` turns on the column menu of the table, which hides
+  and shows columns, and the host keeps the choice per `tableId`.
+  `defaultHiddenTableColumns` hides the columns that another one sums up
+  (Ready, Active and Fallback, which Status sums up) or that `kubectl get`
+  shows with `-o wide` only, so that a list fits a narrow window.
 - `clusterPageMenus` has one KEDA group, with the KEDA icon, which opens the
   Scaled Objects page, and one entry per kind under it, by `parentId`.
 - The panels of ScaledObject and ScaledJob share `Triggers`, the list of their

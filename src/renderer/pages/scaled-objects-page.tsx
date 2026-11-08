@@ -27,21 +27,28 @@ const sortingCallbacks = {
   age: (object: KubeObject) => object.getCreationTimestamp(),
 };
 
-const renderTableHeader: { title: string; sortBy: keyof typeof sortingCallbacks; className?: string }[] = [
-  { title: "Name", sortBy: "name" },
-  { title: "Namespace", sortBy: "namespace" },
-  { title: "Scale Target", sortBy: "scaleTarget", className: styles.scaleTarget },
-  { title: "Min", sortBy: "min", className: styles.min },
-  { title: "Max", sortBy: "max", className: styles.max },
-  { title: "Triggers", sortBy: "triggers", className: styles.triggers },
-  { title: "Status", sortBy: "status", className: styles.status },
-  { title: "Ready", sortBy: "ready", className: styles.ready },
-  { title: "Active", sortBy: "active", className: styles.active },
-  { title: "Fallback", sortBy: "fallback", className: styles.fallback },
-  { title: "Age", sortBy: "age", className: styles.age },
-];
+const renderTableHeader = (
+  [
+    { title: "Name", sortBy: "name" },
+    { title: "Namespace", sortBy: "namespace" },
+    { title: "Scale Target", sortBy: "scaleTarget", className: styles.scaleTarget },
+    { title: "Min", sortBy: "min", className: styles.min },
+    { title: "Max", sortBy: "max", className: styles.max },
+    { title: "Triggers", sortBy: "triggers", className: styles.triggers },
+    { title: "Status", sortBy: "status", className: styles.status },
+    { title: "Ready", sortBy: "ready", className: styles.ready },
+    { title: "Active", sortBy: "active", className: styles.active },
+    { title: "Fallback", sortBy: "fallback", className: styles.fallback },
+    { title: "Age", sortBy: "age", className: styles.age },
+  ] satisfies { title: string; sortBy: keyof typeof sortingCallbacks; className?: string }[]
+).map((header) => ({ ...header, id: header.sortBy }));
 
-// The columns mirror `kubectl get so`: SCALETARGET, MIN, MAX, TRIGGERS, STATUS, READY, ACTIVE, FALLBACK.
+// The column menu of the table hides and shows the columns, by their ids, and the host keeps the choice per table.
+// Ready, Active and Fallback start hidden, as the Status column sums them up, so the list fits a narrow window.
+const defaultHiddenTableColumns: (keyof typeof sortingCallbacks)[] = ["ready", "active", "fallback"];
+
+// The columns follow `kubectl get so`: the scale target as kind/name, MIN, MAX, TRIGGERS, READY, ACTIVE and FALLBACK,
+// with the conditions summed up in Status.
 export const ScaledObjectsPage = observer(() => {
   const store = KubeObject.getStore<KubeObject>();
 
@@ -50,6 +57,8 @@ export const ScaledObjectsPage = observer(() => {
       tableId={`${KubeObject.crd.plural}Table`}
       className={styles.page}
       store={store}
+      isConfigurable
+      defaultHiddenTableColumns={defaultHiddenTableColumns}
       sortingCallbacks={sortingCallbacks}
       searchFilters={[(object: KubeObject) => object.getSearchFields()]}
       renderHeaderTitle={KubeObject.crd.title}
