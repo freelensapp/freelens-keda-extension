@@ -9,11 +9,14 @@ export type { ScaledObjectSpec, ScaledObjectStatus };
  * operator scales the referenced workload, and which scalers (triggers)
  * produce the metric values.
  */
-export class ScaledObject extends Renderer.K8sApi.KubeObject<
+export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
   Renderer.K8sApi.KubeObjectMetadata,
   ScaledObjectStatus,
   ScaledObjectSpec
 > {
+  declare kind: "ScaledObject";
+  declare apiVersion: "keda.sh/v1alpha1";
+
   static readonly kind = "ScaledObject";
   static readonly namespaced = true;
   static readonly apiBase = "/apis/keda.sh/v1alpha1/scaledobjects";
@@ -187,19 +190,7 @@ export class ScaledObject extends Renderer.K8sApi.KubeObject<
   }
 }
 
+// The host registers an API and a store for every version of a CRD the cluster
+// serves, and `ScaledObject.getStore()` resolves them, so the extension builds
+// neither. The class names the type of that API for the list layout.
 export class ScaledObjectApi extends Renderer.K8sApi.KubeApi<ScaledObject> {}
-
-// `autoRegister: false` keeps the API out of the cluster's apiManager: the
-// "Not Available" page of `createAvailableVersionPage` relies on the apiBase
-// being found only when the cluster actually serves the CRD. The store below
-// is registered in the extension's `onActivate` instead.
-export const scaledObjectApi = new ScaledObjectApi({
-  objectConstructor: ScaledObject,
-  autoRegister: false,
-});
-
-export class ScaledObjectStore extends Renderer.K8sApi.KubeObjectStore<ScaledObject> {
-  readonly api = scaledObjectApi;
-}
-
-export const scaledObjectStore = new ScaledObjectStore();

@@ -12,9 +12,9 @@ spec:
   pollingInterval: 30
   cooldownPeriod: 300
   triggers:
-    - type: cron
-      metadata:
-        timezone: America/Sao_Paulo
-        start: 30 0 * * *
-        end: 45 0 * * *
-        desired: "1"
+  - type: cron
+    metadata:
+      timezone: America/Sao_Paulo
+      start: 30 0 * * *
+      end: 45 0 * * *
+      desired: "1"

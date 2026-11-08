@@ -1,5 +1,5 @@
 import { Common, Renderer } from "@freelensapp/extensions";
-import { ScaledObject, scaledObjectStore } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
 
 const {
   Component: { ConfirmDialog, Icon, MenuItem },
@@ -27,7 +27,7 @@ export const ScaledObjectPauseMenuItem = ({ object, toolbar }: ScaledObjectPause
   // for resuming; the host's patch type (string | undefined) does not admit
   // null, hence the cast.
   const annotate = (annotations: Record<string, string | null>) =>
-    scaledObjectStore.patch(
+    ScaledObject.getStore<ScaledObject>().patch(
       object,
       { metadata: { annotations: annotations as unknown as Record<string, string | undefined> } },
       "merge",

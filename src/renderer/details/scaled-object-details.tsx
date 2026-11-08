@@ -2,7 +2,6 @@ import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
 import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
 import styles from "./scaled-object-details.module.scss";
-import stylesInline from "./scaled-object-details.module.scss?inline";
 
 const { observer } = MobxReact;
 
@@ -89,7 +88,6 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
 
   return (
     <>
-      <style>{stylesInline}</style>
       <DrawerItem name="Scale Target">
         {ScaledObject.getScaleTarget(object)}
         {object.spec.scaleTargetRef.apiVersion ? ` (${object.spec.scaleTargetRef.apiVersion})` : ""}

@@ -1,26 +1,28 @@
 # freelens-keda-extension
 
 A Freelens extension for [KEDA](https://keda.sh/) (Kubernetes Event-driven Autoscaling):
-browse ScaledObjects with the same columns as `kubectl get so`, inspect every trigger in
-the details panel, watch the object's scaling events, and pause or resume autoscaling from
-the object menu.
+browse ScaledObjects with the columns of `kubectl get so`, inspect every trigger in the
+details panel, watch the object's scaling events, and pause or resume autoscaling from the
+object menu.
 
-Built for the Freelens **extension API v1** (Freelens 1.x, `engines.freelens: ^1.8.0`), with
-the build layout of the official
-[`freelensapp/freelens-fluxcd-extension`](https://github.com/freelensapp/freelens-fluxcd-extension)
-v5.3.1 (electron-vite, CommonJS bundles in `out/`).
+Built for the Freelens **extension API v2** (Freelens 2.x, `engines.freelens: ^2.0.0`), with
+the build, type-check, test and lint layout of the reference template
+[`freelensapp/freelens-example-extension`](https://github.com/freelensapp/freelens-example-extension)
+(Vite 8, ES module bundles in `dist/`).
 
-Repository: <https://github.com/nidiodolfini/freelens-keda-extension>.
+Repository: <https://github.com/nidiodolfini/freelens-keda-extension> ·
+npm package: [`freelens-keda-extension`](https://www.npmjs.com/package/freelens-keda-extension) ·
+Proposed in [freelensapp/freelens discussion #2840](https://github.com/freelensapp/freelens/discussions/2840).
 
 ## What the extension does
 
-A **Scaled Objects** page, grouped under its own sidebar entry:
+A **Scaled Objects** page (`so`), under its own sidebar entry:
 
-- Columns mirroring `kubectl get so`: Name, Namespace, Scale Target, Min, Max, Triggers,
-  Status, Ready, Active, Fallback and Age.
-- Status comes from the object's conditions and is rendered as a colored badge
-  (`success` / `error` / `warning` / `info`) with the controller's reason
-  (`ScaledObjectReady`, `ScaledObjectCheckFailed`, `Paused`, `Fallback`, `Active`, ...).
+- Columns from `kubectl get so`: Name, Namespace, Scale Target, Min, Max, Triggers, Status,
+  Ready, Active, Fallback and Age.
+- Status sums up the object's conditions as a colored badge (`success` / `error` /
+  `warning` / `info`) with the controller's reason (`ScaledObjectReady`,
+  `ScaledObjectCheckFailed`, `Paused`, `Fallback`, `Active`, ...).
 - When the CRD is not installed in the cluster, the page shows a friendly
   "Not Available" message.
 
@@ -37,6 +39,9 @@ Each ScaledObject also gets a details panel in the drawer:
 - Conditions with their messages as tooltips, external metric names, original replica
   count, last active time and the pause state.
 
+While the extension is enabled, ScaledObjects are left out of the Custom Resources tree of
+the cluster sidebar, so they are listed once, under "Scaled Objects".
+
 **Pause / Scale to Zero / Resume Autoscaling**: the ScaledObject menu writes the pause
 annotations the controller reads, the same as `kubectl annotate so <name> ...`:
 
@@ -49,17 +54,34 @@ annotations the controller reads, the same as `kubectl annotate so <name> ...`:
 
 ## Requirements
 
-- Freelens 1.8 or newer (extension API v1; tested on 1.10.x).
+- Freelens 2.0 or newer (extension API v2). Freelens 1.x needs a 1.x release of the
+  extension, such as 1.0.3.
 - A cluster with KEDA installed (`keda.sh/v1alpha1`, KEDA 2.x).
 
 ## Installation
 
-In Freelens, open **Extensions**, choose **Install** and type `freelens-keda-extension`
-(no path). Freelens resolves the package from the npm registry, exactly like the official
-extensions. Enable it, and the "Scaled Objects" sidebar entry appears on every cluster.
+Open Freelens and go to Extensions (`ctrl`+`shift`+`E` or `cmd`+`shift`+`E`). The field at
+the top takes a package name, the URL of a tarball, or the path to a tarball or a directory.
 
-To install from a local checkout instead (for development), see
-[Development](#development) below.
+### From the registry
+
+Enter `freelens-keda-extension` and press Install. Freelens resolves the package from the
+npm registry, exactly like the official extensions. Enable it, and the "Scaled Objects"
+sidebar entry appears on every cluster.
+
+### From a release tarball
+
+Each [release](https://github.com/nidiodolfini/freelens-keda-extension/releases) has the
+extension as `freelens-keda-extension-<version>.tgz`. Use a release whose major version
+matches your Freelens version. Enter the URL of the `.tgz` asset and press Install, or
+download it and enter its path.
+
+### From a directory
+
+Build the extension (see below), then enter the path to your checkout, the directory with
+`package.json`, and press Install. Freelens runs the extension from that directory, from the
+files in `dist/`, and lists it as unverified. This is how you work on the extension: see
+[Development loop](#development-loop).
 
 ## Usage
 
@@ -74,9 +96,9 @@ To install from a local checkout instead (for development), see
    between 00:30 and 00:45 (America/Sao_Paulo) and scales back to zero, and the CPU
    ScaledObject keeps between 1 and 5 replicas following CPU utilization at 50%.
 
-2. Open the cluster in Freelens. The page lists `example-app-cron` and
-   `example-app-cpu`; each details panel shows its triggers, and the "Scaling Events"
-   section fills in as the controller reconciles.
+2. Open the cluster in Freelens. The page lists `example-app-cron` and `example-app-cpu`; each
+   details panel shows its triggers, and the "Scaling Events" section fills in as the
+   controller reconciles.
 
 3. Open the menu of a ScaledObject and click **Pause Autoscaling** (keeps the current
    replicas) or **Scale to Zero** (confirms, then scales to zero); the Status column
@@ -85,78 +107,72 @@ To install from a local checkout instead (for development), see
 
 ## Development
 
-Node 22+ and pnpm are required.
+Node.js 24 (`.nvmrc`, `mise.toml`) and pnpm 12 through corepack (`packageManager` in
+`package.json`) are required.
 
 ```powershell
 pnpm install
-pnpm type:check     # tsc -p tsconfig.json (single program, as in the fluxcd extension)
+pnpm type:check     # main, renderer, tests, tooling and environment tests, one program each
 pnpm test:unit      # vitest
-pnpm build          # electron-vite build -> out/main and out/renderer (CommonJS)
-pnpm biome:fix      # formatting/lint (TypeScript, TSX, JSON, CSS, HTML)
+pnpm build          # vite build (renderer) and vite build --mode main -> dist/
+pnpm dev            # both builds in watch mode, for a directory install
+pnpm biome:fix      # formatting/lint (TypeScript, TSX, JSON, CSS, SCSS, HTML, YAML, Markdown)
 pnpm biome:check
 pnpm knip:check     # unused files and dependencies (downloads knip via pnpm dlx)
+pnpm trunk:check    # TOML, shell, workflows, yamllint, and Biome again
 pnpm pack:dev       # bump prerelease + build + .tgz to install in Freelens
-pnpm clean          # remove out/
+pnpm clean          # remove dist/
 ```
 
-To load the checkout in Freelens, run `pnpm install && pnpm build`, then in **Extensions**
-choose **Install from directory** and point at this directory; confirm loading the
-extension "in place" so rebuilds reload it automatically.
+Neither `pnpm build` nor `pnpm dev` type-checks; run `pnpm type:check` for that.
 
-### Development environment notes (this workspace)
+### Development loop
 
-The development machine runs inside a sandbox that blocks some standard tooling, so this
-checkout carries a few workarounds; they are documented here because they differ from the
-upstream template:
+Install the extension from your checkout once, as described in
+[From a directory](#from-a-directory), then run:
 
-- `packageManager` is `pnpm@11.28.6`, vendored under the workspace's `.tools/` with a
-  shim at `..\.tools\bin\pnpm.cmd` (add `..\.tools\bin` to `PATH`). pnpm 12 keeps its
-  store lock in `%LOCALAPPDATA%`, which the sandbox blocks.
-- pnpm 11 reads only auth/registry settings from `.npmrc`; every other setting
-  lives in `pnpm-workspace.yaml`. Both files keep the pnpm store and cache
-  inside the workspace: `storeDir: .pnpm-store`, `cacheDir: .pnpm-cache`,
-  `nodeLinker: hoisted` and `autoInstallPeers: true` (the same values are
-  mirrored in `.npmrc` for tooling that still reads it). `stateDir` cannot be
-  set at project level in pnpm 11; the sandbox keeps the state inside the
-  workspace by redirecting `LOCALAPPDATA`.
-- The sandbox blocks spawning child processes with piped stdio, so the workspace's
-  `..\.tools\patch-vite.mjs` applies three environment fixes after `pnpm install`: the
-  `net use` realpath call of Vite (try/catch), the pure-JS `sass` compiler instead of
-  `sass-embedded` (which spawns the Dart Sass binary), and in-process TypeScript
-  transpilation of the electron-vite config instead of the esbuild service (which spawns
-  a binary). Run it from this directory: `node ..\.tools\patch-vite.mjs`.
-- `test:unit` uses `--pool=threads` and `knip:check` uses `&&` instead of the parallel
-  regex script, both because of the same spawn restriction.
-- `biome:*` and `knip:*` download via `pnpm dlx`, whose default cache lives in
-  `%LOCALAPPDATA%`; set `$env:LOCALAPPDATA` to a workspace-local directory before running
-  them on this machine.
+```powershell
+pnpm dev
+```
+
+It rebuilds the extension whenever a source file changes, and Freelens reloads the
+extension after each rebuild, without a restart and without packing. Stop it with
+`ctrl`+`C`. A change to `main` or `renderer` in `package.json` needs Freelens restarted once.
 
 ## Project structure
 
 ```text
-electron.vite.config.js                          # electron-vite config (main + renderer in preload)
-build/global-externals.js                        # plugin: react/mobx/... -> host globals (v1)
+vite.config.mjs                                  # Vite config: renderer (vite build) and main (--mode main)
+build/vite-plugin-host-modules.mjs               # plugin: react/mobx/... -> globalThis.FreelensExtensionApi
+build/vite-plugin-standard-decorators.mjs        # plugin: lowers standard decorators with esbuild
+build/vite-plugin-css-module-declarations.mjs    # plugin: writes the *.module.d.scss.ts declarations
+tsconfig.base.json                               # compiler options shared by every program
+environment-tests/                               # probes that keep Node out of the renderer and the DOM out of main
 src/
   main/index.ts                                  # main entry (stateless)
-  renderer/index.tsx                             # v1 registrations: apiManager, page, details, menu
+  renderer/index.tsx                             # registrations: page, details, menu, customResources
   renderer/api/types.ts                          # KEDA spec/status types
-  renderer/api/scaledobject/scaledobject-v1.ts   # ScaledObject model (+ Api/Store, test)
-  renderer/pages/                                # ScaledObjects page + CSS module
+  renderer/api/scaledobject/scaledobject-v1.ts   # ScaledObject model (+ Api, test)
+  renderer/pages/                                # Scaled Objects page + CSS module
   renderer/details/                              # ScaledObject details panel (incl. Scaling Events)
-  renderer/menus/                                # Pause/Resume Autoscaling (ScaledObject)
+  renderer/menus/                                # Pause/Scale to Zero/Resume Autoscaling (ScaledObject)
   renderer/icons/                                # KEDA logo (currentColor)
   renderer/components/                           # createAvailableVersionPage, error boundaries
+  common/                                        # code both entries would share (none today; its tsconfig stays)
+test/freelens-extensions.ts                      # runtime stub of @freelensapp/extensions for Vitest
 examples/keda/                                   # test objects (kubectl apply -f)
+AGENTS.md                                        # guide for coding agents
 ```
 
-Build output goes to `out/main/index.js` and `out/renderer/index.js` (CommonJS bundles, like
-the other Freelens 1.x extensions); `package.json` points `main`/`renderer` at them.
+Build output goes to `dist/main.js`, `dist/renderer.js` and `dist/renderer.css`, with source
+maps; `package.json` points `main`/`renderer` at the two entries, and Freelens links the
+stylesheet next to the renderer entry.
 
 ## Supported API versions
 
-The extension supports **`keda.sh/v1alpha1` only** (one version per kind, with the
-"Not Available" page when the CRD is missing). To add another version later, follow the
-same per-version model/page/details pattern and list both versions in
+The extension supports **`keda.sh/v1alpha1` only**, the version KEDA 2.x serves (one version
+per kind, with the "Not Available" page when the CRD is missing). To add another version
+later, follow the same per-version model/page/details pattern and list both versions in
 `createAvailableVersionPage`, newest first.
 
 ## Publishing a release

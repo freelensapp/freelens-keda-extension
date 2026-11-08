@@ -1,7 +1,5 @@
 import { Renderer } from "@freelensapp/extensions";
 
-import type { BaseKubeObjectCondition } from "@freelensapp/kube-object";
-
 /**
  * The CRD metadata of a KEDA resource, with the human-readable title the
  * extension shows in its pages.
@@ -12,9 +10,10 @@ export interface KedaKubeObjectCRD extends Renderer.K8sApi.LensExtensionKubeObje
 
 /**
  * A status condition, as KEDA writes it into `status.conditions`: the
- * `BaseKubeObjectCondition` of `@freelensapp/kube-object`.
+ * `BaseKubeObjectCondition` of the host's kube objects, which `K8sApi`
+ * re-exports.
  */
-export type KedaCondition = BaseKubeObjectCondition;
+export type KedaCondition = Renderer.K8sApi.BaseKubeObjectCondition;
 
 /**
  * `spec.triggers[]`: one scaler configuration. The controller requires the
