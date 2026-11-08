@@ -263,7 +263,8 @@ memory:
    KEDA group (`parentId: "keda"`).
 4. **The details panel** in `src/renderer/details/`, registered in
    `kubeObjectDetailItems` with `Renderer.K8sApi.detailsFor` and the model
-   class.
+   class, with only what the host does not show already ("Renderer
+   Components").
 5. **Menu items** in `src/renderer/menus/`, registered in `kubeObjectMenuItems`
    with `Renderer.K8sApi.menuItemFor` and the model class, only for what the
    resource supports: `PauseMenuItem` writes the `autoscaling.keda.sh/paused`
@@ -332,6 +333,12 @@ from the Custom Resources tree.
   that apply to the object's kind and state, in a fragment: Pause Autoscaling,
   and Scale to Zero for a ScaledObject, while it is not paused, Resume
   Autoscaling while it is.
+- A details panel shows only what the host does not. For any custom resource
+  the host renders `CustomResourceDetails` in the same drawer, with every
+  printer column of the CRD and the conditions, reasons and messages
+  included, and its Events section at the end. A field of a printer column
+  comes back in a panel only as more than its value, such as the scale target
+  as a link to the workload.
 - `clusterPageMenus` has one KEDA group, with the KEDA icon, which opens the
   Scaled Objects page, and one entry per kind under it, by `parentId`.
 - The panels of ScaledObject and ScaledJob share `Triggers`, the list of their

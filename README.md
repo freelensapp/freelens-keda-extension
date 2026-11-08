@@ -41,10 +41,10 @@ Each resource also gets a details panel in the drawer, next to what the host sho
 custom resource (the printer columns of its CRD, its conditions and its events):
 
 - **ScaledObject**: links to the workload it scales and to the HorizontalPodAutoscaler the
-  controller created for it, min/max replicas, polling
-  interval, cooldown period, idle replica count, initial cooldown period, `advanced` options,
-  fallback, conditions, external metric names, original replica count, last active time and
-  the pause state.
+  controller created for it, polling interval, cooldown period, idle replica count, initial
+  cooldown period, the `advanced` options (restore to original, scaling modifiers), the
+  fallback and the health of each metric it counts, external metric names, original replica
+  count and last active time.
 - **ScaledJob**: the containers and the limits of the Jobs it creates, polling interval, the
   history limits, the rollout and scaling strategies, external metric names and last active
   time.
