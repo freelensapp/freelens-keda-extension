@@ -240,6 +240,6 @@ Trusted Publishing / provenance).
 
 ## License
 
-MIT. The sidebar icon is the official KEDA logo (Kubernetes-style heptagon with the KEDA
-lettering, Apache-2.0), recolored with `currentColor` and with the white knockout converted
-to an SVG mask so it follows the Freelens theme.
+MIT. The sidebar icon is drawn from the KEDA logo (Apache-2.0), its Kubernetes-style heptagon
+and the lightning bolt of its lettering, as filled shapes in `currentColor`, so it follows the
+Freelens theme.
