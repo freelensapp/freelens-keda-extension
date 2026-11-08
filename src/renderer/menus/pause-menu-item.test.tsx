@@ -3,8 +3,9 @@
 import { Renderer } from "@freelensapp/extensions";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ScaledJob } from "../api/scaledjob/scaledjob-v1alpha1";
 import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
-import { ScaledObjectPauseMenuItem } from "./scaled-object-pause-menu-item";
+import { PauseMenuItem } from "./pause-menu-item";
 
 const PAUSED = "autoscaling.keda.sh/paused";
 const PAUSED_REPLICAS = "autoscaling.keda.sh/paused-replicas";
@@ -19,15 +20,29 @@ const buildScaledObject = (annotations?: Record<string, string>) =>
       selfLink: "/apis/keda.sh/v1alpha1/namespaces/default/scaledobjects/example-app",
       annotations,
     },
-    spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+    spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
   });
 
-// The store the host registers for the kind, reduced to the patch the component calls.
-const stubStore = () => {
-  const patch = vi.fn(async (_object: ScaledObject, _patch: unknown, _strategy: string) => undefined);
-  vi.spyOn(ScaledObject, "getStore").mockReturnValue({ patch } as unknown as Renderer.K8sApi.KubeObjectStore<
-    ScaledObject,
-    Renderer.K8sApi.KubeApi<ScaledObject>
+const buildScaledJob = (annotations?: Record<string, string>) =>
+  new ScaledJob({
+    apiVersion: "keda.sh/v1alpha1",
+    kind: "ScaledJob",
+    metadata: {
+      name: "example-job",
+      namespace: "default",
+      selfLink: "/apis/keda.sh/v1alpha1/namespaces/default/scaledjobs/example-job",
+      annotations,
+    },
+    spec: { jobTargetRef: { template: { metadata: {}, spec: {} } }, triggers: [{ type: "cron", metadata: {} }] },
+  });
+
+// The store the host registers for a kind, reduced to the patch the component calls.
+const stubStore = (kubeObjectClass: typeof Renderer.K8sApi.LensExtensionKubeObject<any, any, any> = ScaledObject) => {
+  const patch = vi.fn(async (_object: ScaledObject | ScaledJob, _patch: unknown, _strategy: string) => undefined);
+  vi.spyOn(kubeObjectClass, "getStore").mockReturnValue({ patch } as unknown as Renderer.K8sApi.KubeObjectStore<
+    any,
+    any,
+    any
   >);
   return patch;
 };
@@ -45,10 +60,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("ScaledObjectPauseMenuItem", () => {
+describe("PauseMenuItem", () => {
   describe("for an object that is not paused", () => {
     it("offers to pause and to scale to zero, not to resume", () => {
-      render(<ScaledObjectPauseMenuItem object={buildScaledObject()} />);
+      render(<PauseMenuItem object={buildScaledObject()} />);
 
       expect(screen.getByText("Pause Autoscaling")).toBeDefined();
       expect(screen.getByText("Scale to Zero")).toBeDefined();
@@ -58,7 +73,7 @@ describe("ScaledObjectPauseMenuItem", () => {
     it("pauses at the current replica count with the paused annotation", () => {
       const patch = stubStore();
       const object = buildScaledObject();
-      render(<ScaledObjectPauseMenuItem object={object} />);
+      render(<PauseMenuItem object={object} />);
 
       fireEvent.click(screen.getByText("Pause Autoscaling"));
 
@@ -69,7 +84,7 @@ describe("ScaledObjectPauseMenuItem", () => {
     it("asks for confirmation before scaling to zero, and writes paused-replicas 0 on ok", () => {
       const patch = stubStore();
       const open = vi.spyOn(Renderer.Component.ConfirmDialog, "open");
-      render(<ScaledObjectPauseMenuItem object={buildScaledObject()} />);
+      render(<PauseMenuItem object={buildScaledObject()} />);
 
       fireEvent.click(screen.getByText("Scale to Zero"));
 
@@ -85,7 +100,7 @@ describe("ScaledObjectPauseMenuItem", () => {
     // the spaces at its edges, so the question is one paragraph.
     it("asks to scale the target to zero in one paragraph", () => {
       const open = vi.spyOn(Renderer.Component.ConfirmDialog, "open");
-      render(<ScaledObjectPauseMenuItem object={buildScaledObject()} />);
+      render(<PauseMenuItem object={buildScaledObject()} />);
 
       fireEvent.click(screen.getByText("Scale to Zero"));
       const { container } = render(<>{open.mock.calls[0][0].message}</>);
@@ -100,7 +115,7 @@ describe("ScaledObjectPauseMenuItem", () => {
 
   describe("for a paused object", () => {
     it("offers only to resume when paused at the current replica count", () => {
-      render(<ScaledObjectPauseMenuItem object={buildScaledObject({ [PAUSED]: "true" })} />);
+      render(<PauseMenuItem object={buildScaledObject({ [PAUSED]: "true" })} />);
 
       expect(screen.getByText("Resume Autoscaling")).toBeDefined();
       expect(screen.queryByText("Pause Autoscaling")).toBeNull();
@@ -108,7 +123,7 @@ describe("ScaledObjectPauseMenuItem", () => {
     });
 
     it("offers only to resume when scaled to zero", () => {
-      render(<ScaledObjectPauseMenuItem object={buildScaledObject({ [PAUSED_REPLICAS]: "0" })} />);
+      render(<PauseMenuItem object={buildScaledObject({ [PAUSED_REPLICAS]: "0" })} />);
 
       expect(screen.getByText("Resume Autoscaling")).toBeDefined();
       expect(screen.queryByText("Pause Autoscaling")).toBeNull();
@@ -117,7 +132,7 @@ describe("ScaledObjectPauseMenuItem", () => {
 
     it("resumes by removing both annotations in the merge patch", () => {
       const patch = stubStore();
-      render(<ScaledObjectPauseMenuItem object={buildScaledObject({ [PAUSED_REPLICAS]: "0" })} />);
+      render(<PauseMenuItem object={buildScaledObject({ [PAUSED_REPLICAS]: "0" })} />);
 
       fireEvent.click(screen.getByText("Resume Autoscaling"));
 
@@ -125,8 +140,41 @@ describe("ScaledObjectPauseMenuItem", () => {
     });
   });
 
+  describe("for a ScaledJob", () => {
+    it("offers to pause, and not to scale to zero, which a ScaledJob does not have", () => {
+      render(<PauseMenuItem object={buildScaledJob()} />);
+
+      expect(screen.getByText("Pause Autoscaling")).toBeDefined();
+      expect(screen.queryByText("Scale to Zero")).toBeNull();
+      expect(screen.queryByText("Resume Autoscaling")).toBeNull();
+    });
+
+    it("pauses through the store of the ScaledJob kind", () => {
+      const scaledObjectPatch = stubStore(ScaledObject);
+      const patch = stubStore(ScaledJob);
+      const object = buildScaledJob();
+      render(<PauseMenuItem object={object} />);
+
+      fireEvent.click(screen.getByText("Pause Autoscaling"));
+
+      expect(scaledObjectPatch).not.toHaveBeenCalled();
+      expect(patch.mock.calls[0][0]).toBe(object);
+      expect(patchedAnnotations(patch)).toEqual({ [PAUSED]: "true" });
+    });
+
+    it("offers only to resume when paused, and resumes by removing the annotation", () => {
+      const patch = stubStore(ScaledJob);
+      render(<PauseMenuItem object={buildScaledJob({ [PAUSED]: "true" })} />);
+
+      expect(screen.queryByText("Pause Autoscaling")).toBeNull();
+      fireEvent.click(screen.getByText("Resume Autoscaling"));
+
+      expect(patchedAnnotations(patch)).toEqual({ [PAUSED]: null, [PAUSED_REPLICAS]: null });
+    });
+  });
+
   it("renders nothing without an object", () => {
-    const { container } = render(<ScaledObjectPauseMenuItem object={undefined as unknown as ScaledObject} />);
+    const { container } = render(<PauseMenuItem object={undefined as unknown as ScaledObject} />);
 
     expect(container.textContent).toBe("");
   });

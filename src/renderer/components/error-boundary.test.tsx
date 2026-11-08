@@ -131,7 +131,7 @@ describe("the registration wrappers", () => {
       apiVersion: "keda.sh/v1alpha1",
       kind: "ScaledObject",
       metadata: { name: "example-app", namespace: "default", uid: "1", resourceVersion: "1", selfLink: "" },
-      spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+      spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
     });
     vi.spyOn(ScaledObject, "getStore").mockReturnValue({
       items: [object],

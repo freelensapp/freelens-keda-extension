@@ -1,0 +1,11 @@
+# A ClusterTriggerAuthentication that passes the parameter "timezone" from the
+# variable TZ of the scale target's container, so it needs no Secret in the
+# namespace of the operator. The ScaledObject example-cron refers to it.
+apiVersion: keda.sh/v1alpha1
+kind: ClusterTriggerAuthentication
+metadata:
+  name: example-cluster-auth
+spec:
+  env:
+  - parameter: timezone
+    name: TZ

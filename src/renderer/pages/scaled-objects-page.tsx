@@ -1,7 +1,7 @@
 import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
 import { ScaledObject, type ScaledObjectApi } from "../api/scaledobject/scaledobject-v1alpha1";
-import styles from "./scaled-objects-page.module.scss";
+import styles from "./keda-pages.module.scss";
 
 const { observer } = MobxReact;
 

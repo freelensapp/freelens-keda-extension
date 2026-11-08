@@ -41,3 +41,7 @@ spec:
       containers:
       - name: pause
         image: registry.k8s.io/pause:3.10
+        env:
+        # Read by the ClusterTriggerAuthentication example-cluster-auth.
+        - name: TZ
+          value: America/Sao_Paulo

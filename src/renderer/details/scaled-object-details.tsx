@@ -2,6 +2,7 @@ import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
 import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
 import { ScalingEvents } from "./scaling-events";
+import { Triggers } from "./triggers";
 
 const { observer } = MobxReact;
 
@@ -24,7 +25,6 @@ function conditionClass(status: string): string {
 
 export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProps) => {
   const conditions = object.status?.conditions;
-  const triggers = object.spec.triggers ?? [];
   const fallback = object.spec.fallback;
 
   return (
@@ -50,30 +50,7 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
           ? String(object.spec.advanced.restoreToOriginalReplicaCount)
           : "-"}
       </DrawerItem>
-      <DrawerItem name="Triggers" labelsOnly hidden={triggers.length === 0}>
-        {triggers.map((trigger, index) => (
-          <DrawerItem
-            key={`${trigger.type}-${trigger.name ?? index}`}
-            name={
-              <>
-                <Badge label={trigger.type} /> {trigger.name}
-              </>
-            }
-          >
-            {trigger.metadata &&
-              Object.entries(trigger.metadata).map(([key, value]) => (
-                <DrawerItem key={key} name={key}>
-                  {value}
-                </DrawerItem>
-              ))}
-            {trigger.authenticationRef && (
-              <DrawerItem name="Authentication Ref">
-                {trigger.authenticationRef.kind ?? "TriggerAuthentication"}/{trigger.authenticationRef.name}
-              </DrawerItem>
-            )}
-          </DrawerItem>
-        ))}
-      </DrawerItem>
+      <Triggers triggers={object.spec.triggers ?? []} />
       <DrawerItem name="Fallback">
         {fallback
           ? `enabled (failureThreshold: ${fallback.failureThreshold}, replicas: ${fallback.replicas})`
