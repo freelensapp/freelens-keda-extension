@@ -392,8 +392,11 @@ from the Custom Resources tree.
   the regenerated file with a change to its SCSS module; `pnpm clean:dts`
   removes them.
 - Icons are SVG files imported with `?raw` and rendered by
-  `Renderer.Component.Icon` through its `svg` prop. Biome leaves `.svg` files
-  alone (`biome.jsonc`), so the icon stays as authored.
+  `Renderer.Component.Icon` through its `svg` prop, on the 24x24 grid of the
+  other sidebar icons with a margin of 2: the KEDA icon is the heptagon and the
+  lightning bolt of the KEDA logo, whose lettering does not survive 20 pixels.
+  An icon is made of filled shapes only ("Rules That Fail Silently"). Biome
+  leaves `.svg` files alone (`biome.jsonc`), so the icon stays as authored.
 
 ## Rules That Fail Silently
 
@@ -456,6 +459,13 @@ or not visibly at all.
   and its message as flex items, so text beside an inline element such as
   `<b>` becomes flex items of its own, which lose the spaces at their edges.
   Wrap the message in a `<p>`; the menu item test checks it.
+- **An icon of filled shapes.** The host fills every element of an inline SVG
+  icon with `currentColor` (`.Icon.svg svg * { fill: currentColor }`), which
+  overrides `fill="none"`: an outline drawn with a stroke renders as a solid
+  shape, and the black and white of a mask both turn into the icon's color:
+  the icon of 2.0.0 rendered as a solid heptagon. An outline is a ring of two paths with
+  `fill-rule="evenodd"`; `keda.test.ts` rejects a stroke, `fill="none"` and
+  a mask.
 - **Every page, details panel and menu item inside an error boundary**
   ("Renderer Components").
 - **A cluster page gets the extension from its registration.** The host passes
