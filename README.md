@@ -19,7 +19,8 @@ Proposed in [freelensapp/freelens discussion #2840](https://github.com/freelensa
 A **Scaled Objects** page (`so`), under its own sidebar entry:
 
 - Columns from `kubectl get so`: Name, Namespace, Scale Target, Min, Max, Triggers, Status,
-  Ready, Active, Fallback and Age.
+  Ready, Active, Fallback and Age. The scale target reads `kind/name`, such as
+  `Deployment/example-app`, before and after the controller has resolved it.
 - Status sums up the object's conditions as a colored badge (`success` / `error` /
   `warning` / `info`) with the controller's reason (`ScaledObjectReady`,
   `ScaledObjectCheckFailed`, `Paused`, `Fallback`, `Active`, ...).
@@ -89,15 +90,19 @@ files in `dist/`, and lists it as unverified. This is how you work on the extens
 1. Apply the example objects to a cluster with KEDA installed:
 
    ```powershell
-   kubectl apply -f examples/keda/scaledobject-cron.yaml
+   kubectl apply -f examples/keda/deployments.yaml
    kubectl apply -f examples/keda/scaledobject-cpu.yaml
+   kubectl apply -f examples/keda/scaledobject-cron.yaml
    ```
 
-   Both scale the Deployment `example-app`: the cron ScaledObject wakes one replica
-   between 00:30 and 00:45 (America/Sao_Paulo) and scales back to zero, and the CPU
-   ScaledObject keeps between 1 and 5 replicas following CPU utilization at 50%.
+   `deployments.yaml` creates two Deployments of the pause image, `example-app` and
+   `example-cron`: KEDA accepts one ScaledObject per workload, so each ScaledObject scales a
+   Deployment of its own. `example-app-cpu` keeps `example-app` between 1 and 5 replicas
+   following CPU utilization at 50% (the HPA reads the CPU from metrics-server), and
+   `example-cron` wakes one replica of `example-cron` between 00:30 and 00:45
+   (America/Sao_Paulo) and scales it back to zero.
 
-2. Open the cluster in Freelens. The page lists `example-app-cron` and `example-app-cpu`; each
+2. Open the cluster in Freelens. The page lists `example-app-cpu` and `example-cron`; each
    details panel shows its triggers, and the "Scaling Events" section fills in as the
    controller reconciles.
 

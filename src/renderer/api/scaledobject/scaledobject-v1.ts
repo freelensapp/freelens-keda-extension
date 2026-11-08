@@ -101,13 +101,26 @@ export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
   }
 
   /**
-   * The SCALETARGET column of `kubectl get so`: `kind/name`, preferring the
-   * kind the controller resolved in the status over the one in the spec, and
-   * defaulting to a Deployment.
+   * The kind of the scale target. The controller resolves it into the status
+   * as a GVK string, `<group>/<version>.<kind>` (`apps/v1.Deployment`), so the
+   * kind is what follows the last dot. Until the controller has resolved it,
+   * and for an object it rejects, such as a second ScaledObject on the same
+   * workload, it is the kind of the spec, or Deployment, the controller's
+   * default.
+   */
+  static getScaleTargetKind(object: ScaledObject): string {
+    const resolved = object.status?.scaleTargetKind;
+    if (resolved) return resolved.slice(resolved.lastIndexOf(".") + 1);
+    return object.spec.scaleTargetRef.kind ?? "Deployment";
+  }
+
+  /**
+   * The SCALETARGETKIND and SCALETARGETNAME columns of `kubectl get so` as one
+   * `kind/name`, with the kind alone, so that the target reads the same
+   * before and after the controller has resolved it.
    */
   static getScaleTarget(object: ScaledObject): string {
-    const kind = object.status?.scaleTargetKind ?? object.spec.scaleTargetRef.kind ?? "Deployment";
-    return `${kind}/${object.spec.scaleTargetRef.name}`;
+    return `${ScaledObject.getScaleTargetKind(object)}/${object.spec.scaleTargetRef.name}`;
   }
 
   static getScaleTargetName(object: ScaledObject): string {

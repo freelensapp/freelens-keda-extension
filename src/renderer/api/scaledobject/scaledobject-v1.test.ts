@@ -175,12 +175,39 @@ describe("ScaledObject (v1alpha1)", () => {
   });
 
   describe("getScaleTarget", () => {
-    it("prefers the kind resolved in the status over the one in the spec", () => {
+    // The controller writes the resolved kind as a GVK string, `<group>/<version>.<kind>`.
+    it("takes the kind out of the GVK the controller resolved in the status", () => {
       const object = buildScaledObject(
-        { scaleTargetRef: { name: "example-app", kind: "StatefulSet" }, triggers: [{ type: "cpu" }] },
-        { scaleTargetKind: "Deployment" },
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetKind: "apps/v1.Deployment" },
       );
+      expect(ScaledObject.getScaleTargetKind(object)).toBe("Deployment");
       expect(ScaledObject.getScaleTarget(object)).toBe("Deployment/example-app");
+    });
+
+    it("takes the kind out of a GVK whose group has dots", () => {
+      const object = buildScaledObject(
+        {
+          scaleTargetRef: { name: "example-app", apiVersion: "argoproj.io/v1alpha1", kind: "Rollout" },
+          triggers: [{ type: "cpu" }],
+        },
+        { scaleTargetKind: "argoproj.io/v1alpha1.Rollout" },
+      );
+      expect(ScaledObject.getScaleTarget(object)).toBe("Rollout/example-app");
+    });
+
+    // A ScaledObject the controller rejects, such as a second one on the same workload, never gets a
+    // resolved kind, and reads the same as one it accepted.
+    it("reads the same before the controller has resolved the kind", () => {
+      const resolved = buildScaledObject(
+        { scaleTargetRef: { name: "example-app", kind: "Deployment" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetKind: "apps/v1.Deployment" },
+      );
+      const unresolved = buildScaledObject({
+        scaleTargetRef: { name: "example-app", kind: "Deployment" },
+        triggers: [{ type: "cpu" }],
+      });
+      expect(ScaledObject.getScaleTarget(unresolved)).toBe(ScaledObject.getScaleTarget(resolved));
     });
 
     it("uses the kind of the spec when the status has none", () => {

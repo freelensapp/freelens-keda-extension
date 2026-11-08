@@ -100,7 +100,7 @@ test/freelens-extensions.ts          # Runtime stub of @freelensapp/extensions f
 environment-tests/                   # Probes for the per-environment programs
 build/                               # Vite plugins: host modules, standard decorators, CSS module declarations
 vite.config.mjs                      # The build, renderer and main
-examples/keda/                       # Test objects scaling the Deployment example-app (kubectl apply -f)
+examples/keda/                       # Test objects: two Deployments and a ScaledObject for each (kubectl apply -f)
 ```
 
 Build output goes to `dist/`: `main.js`, `renderer.js` and `renderer.css`, with
@@ -132,7 +132,10 @@ is not, and calling it throws. So:
   `ScaledObject.getStatusText(object)`. The statics read the conditions the
   controller writes (`Ready`, `Active`, `Fallback`, `Paused`) and sum them up
   in the Status column with the controller's precedence: an error of Ready,
-  then Paused, Fallback, Active and Ready. `getTriggerTypes` and
+  then Paused, Fallback, Active and Ready. `getScaleTargetKind` takes the kind
+  out of the GVK string the controller resolves into the status
+  (`apps/v1.Deployment`), and falls back to the kind of the spec for an object
+  the controller has not resolved, or rejected. `getTriggerTypes` and
   `getExternalMetricNames` normalize the status list fields that KEDA versions
   write either as an array or as a comma-separated string.
 - **Constants**: the annotations the controller reads are `static readonly`
@@ -255,7 +258,9 @@ memory:
 7. **Tests** for the static helpers, next to the model, and for a menu item,
    next to it; a member of the host that a test reaches goes into the stub, as
    small as the test needs.
-8. **A test object** in `examples/keda/`, and its row in `README.md`.
+8. **A test object** in `examples/keda/`, and its row in `README.md`. KEDA
+   accepts one ScaledObject per workload, so each test object scales a workload
+   of its own.
 
 Then check the result in Freelens with the checkout installed from its
 directory (`README.md`, "Development loop"): the page lists the test object,
