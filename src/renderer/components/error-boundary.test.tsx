@@ -3,7 +3,7 @@
 import { Common, type Renderer } from "@freelensapp/extensions";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
 import { ScaledObjectsPage } from "../pages/scaled-objects-page";
 import {
   ErrorBoundary,

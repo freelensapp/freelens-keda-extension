@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ScaledObject } from "./scaledobject-v1";
+import { ScaledObject } from "./scaledobject-v1alpha1";
 
 // `@freelensapp/extensions` is stubbed for tests (see `test/freelens-extensions.ts`),
 // which lets us construct a real `ScaledObject` instance from plain resource data.

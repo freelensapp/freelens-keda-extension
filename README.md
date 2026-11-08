@@ -159,7 +159,7 @@ src/
   renderer/index.tsx                             # registrations: page, details, menu, customResources
   renderer/api/types.ts                          # KEDA spec/status types
   renderer/api/events.ts                         # last seen time and order of the events, for both event APIs
-  renderer/api/scaledobject/scaledobject-v1.ts   # ScaledObject model (+ Api, test)
+  renderer/api/scaledobject/scaledobject-v1alpha1.ts   # ScaledObject model (+ Api, test)
   renderer/pages/                                # Scaled Objects page + CSS module
   renderer/details/                              # ScaledObject details panel, Scaling Events
   renderer/menus/                                # Pause/Scale to Zero/Resume Autoscaling (ScaledObject)

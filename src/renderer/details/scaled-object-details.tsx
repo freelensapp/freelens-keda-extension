@@ -1,6 +1,6 @@
 import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
-import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
 import { ScalingEvents } from "./scaling-events";
 
 const { observer } = MobxReact;

@@ -3,7 +3,7 @@
 import { Renderer } from "@freelensapp/extensions";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
 import { ScaledObjectPauseMenuItem } from "./scaled-object-pause-menu-item";
 
 const PAUSED = "autoscaling.keda.sh/paused";

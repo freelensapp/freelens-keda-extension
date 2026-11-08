@@ -4,7 +4,7 @@
  */
 
 import { Renderer } from "@freelensapp/extensions";
-import { ScaledObject } from "./api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "./api/scaledobject/scaledobject-v1alpha1";
 import { createAvailableVersionPage } from "./components/available-version";
 import {
   withDetailsErrorBoundary,

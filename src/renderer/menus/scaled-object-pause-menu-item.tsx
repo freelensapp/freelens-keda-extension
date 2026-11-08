@@ -1,5 +1,5 @@
 import { Common, Renderer } from "@freelensapp/extensions";
-import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
 
 const {
   Component: { ConfirmDialog, Icon, MenuItem },

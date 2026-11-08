@@ -109,7 +109,7 @@ source maps. `main` and `renderer` in `package.json` point at the two entries.
 ## CRD KubeObject Pattern
 
 A model is a subclass of `Renderer.K8sApi.LensExtensionKubeObject`, one file
-per kind and version: `src/renderer/api/scaledobject/scaledobject-v1.ts`.
+per kind and version: `src/renderer/api/scaledobject/scaledobject-v1alpha1.ts`.
 
 The host reads the model's metadata from the class, through `static readonly`
 properties. The objects it hands to the extension, in a list, a details panel
