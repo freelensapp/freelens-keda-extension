@@ -1,8 +1,9 @@
 # freelens-keda-extension
 
 A Freelens extension for [KEDA](https://keda.sh/) (Kubernetes Event-driven Autoscaling):
-browse ScaledObjects with the columns of `kubectl get so`, inspect every trigger in the
-details panel, watch the object's scaling events, and pause or resume autoscaling from the
+browse ScaledObjects, ScaledJobs, TriggerAuthentications and ClusterTriggerAuthentications
+with the columns of `kubectl get`, inspect every trigger and every authentication parameter
+in the details panels, watch the scaling events, and pause or resume autoscaling from the
 object menu.
 
 Built for the Freelens **extension API v2** (Freelens 2.x, `engines.freelens: ^2.0.0`), with
@@ -16,41 +17,69 @@ Proposed in [freelensapp/freelens discussion #2840](https://github.com/freelensa
 
 ## What the extension does
 
-A **Scaled Objects** page (`so`), under its own sidebar entry:
+Four cluster pages, one per KEDA resource, grouped under a **KEDA** sidebar entry:
 
-- Columns from `kubectl get so`: Name, Namespace, Scale Target, Min, Max, Triggers, Status,
-  Ready, Active, Fallback and Age. The scale target reads `kind/name`, such as
-  `Deployment/example-app`, before and after the controller has resolved it.
-- Status sums up the object's conditions as a colored badge (`success` / `error` /
-  `warning` / `info`) with the controller's reason (`ScaledObjectReady`,
-  `ScaledObjectCheckFailed`, `Paused`, `Fallback`, `Active`, ...).
-- When the CRD is not installed in the cluster, the page shows a friendly
-  "Not Available" message.
+- **Scaled Objects** (`so`) — Name, Namespace, Scale Target, Min, Max, Triggers, Status,
+  Ready, Active, Fallback and Age, from the columns of `kubectl get so`. The scale target
+  reads `kind/name`, such as `Deployment/example-app`, before and after the controller has
+  resolved it.
+- **Scaled Jobs** (`sj`) — Name, Namespace, Min, Max, Triggers, Status, Ready, Active and Age,
+  from `kubectl get sj`.
+- **Trigger Authentications** (`ta`) — Name, Namespace, Pod Identity, Secret, Env, Vault
+  Address, the Scaled Objects and Scaled Jobs that use it, and Age, from
+  `kubectl get ta -o wide`.
+- **Cluster Trigger Authentications** (`cta`) — the same without Namespace, with the File
+  Path, from `kubectl get cta -o wide`.
 
-Each ScaledObject also gets a details panel in the drawer:
+Every list has a column menu, which hides and shows columns and keeps the choice per list.
+So that a list fits a narrow window, some columns start hidden: Ready, Active and Fallback,
+which Status sums up, and the objects that use an authentication, which `kubectl get` shows
+with `-o wide` only.
 
-- Scale target (`kind/name` + apiVersion), min/max replicas, polling interval, cooldown
-  period, idle replica count, initial cooldown period, `advanced` options and fallback.
-- **Triggers**: one section per scaler, with its type as a badge, its name, its metadata
-  as key/value sub-items and its authentication ref.
-- **Scaling Events**: the events the cluster records for the object (KEDA writes one per
-  scaling decision), read from the host's event store and shown as a table — Type, Reason,
-  Message, Count and Last Seen — newest first, up to 20. Last Seen and Count read both event
-  APIs: the `lastTimestamp` and `count` of KEDA 2.20 and older, and the `eventTime` and
-  `series` of the `events.k8s.io/v1` API that KEDA 2.21 records through.
-- Conditions with their messages as tooltips, external metric names, original replica
-  count, last active time and the pause state.
+Status sums up the conditions of a ScaledObject or a ScaledJob as a colored badge
+(`success` / `error` / `warning` / `info`) with the controller's reason
+(`ScaledObjectReady`, `ScaledObjectCheckFailed`, `Paused`, `Fallback`, `Active`, ...).
+When a CRD is not installed in the cluster, its page shows a friendly "Not Available"
+message.
 
-While the extension is enabled, ScaledObjects are left out of the Custom Resources tree of
-the cluster sidebar, so they are listed once, under "Scaled Objects".
+Each resource also gets a details panel in the drawer, next to what the host shows for any
+custom resource (the printer columns of its CRD, its conditions and its events):
 
-**Pause / Scale to Zero / Resume Autoscaling**: the ScaledObject menu writes the pause
-annotations the controller reads, the same as `kubectl annotate so <name> ...`:
+- **ScaledObject**: links to the workload it scales and to the HorizontalPodAutoscaler the
+  controller created for it, polling interval, cooldown period, idle replica count, initial
+  cooldown period, the `advanced` options (restore to original, scaling modifiers), the
+  fallback and the health of each metric it counts, external metric names, original replica
+  count and last active time.
+- **ScaledJob**: the containers and the limits of the Jobs it creates, polling interval, the
+  history limits, the rollout and scaling strategies, external metric names and last active
+  time.
+- **Triggers**, for both: one section per scaler, with its type as a badge, its name, its
+  metric type, its metadata as key/value sub-items and a link to its TriggerAuthentication or
+  ClusterTriggerAuthentication.
+- **Scaling Events**, for both: the events the cluster records for the object (KEDA writes one
+  per scaling decision), read from the host's event store and shown as a table — Type,
+  Reason, Message, Count and Last Seen — newest first, up to 20. Last Seen and Count read
+  both event APIs: the `lastTimestamp` and `count` of KEDA 2.20 and older, and the
+  `eventTime` and `series` of the `events.k8s.io/v1` API that KEDA 2.21 records through.
+- **TriggerAuthentication** and **ClusterTriggerAuthentication**: every parameter the scalers
+  get, with where its value comes from (Secret, ConfigMap, Env, HashiCorp Vault, Azure Key
+  Vault, GCP Secret Manager, AWS Secrets Manager or a service account token), the settings of
+  pod identity, Vault, the cloud secret managers, OAuth2 and Azure service principals, and,
+  for a TriggerAuthentication, links to the Secrets, ConfigMaps and service accounts it names
+  and to the ScaledObjects and ScaledJobs that use it.
 
-- **Pause Autoscaling** sets `autoscaling.keda.sh/paused=true`, which freezes the target at
-  its current replica count (KEDA 2.12 or newer).
-- **Scale to Zero** sets `autoscaling.keda.sh/paused-replicas=0`, which scales the target
-  down to zero replicas and keeps it there. It asks for confirmation first.
+While the extension is enabled, the four kinds are left out of the Custom Resources tree of
+the cluster sidebar, so each of them is listed once, under "KEDA".
+
+**Pause / Scale to Zero / Resume Autoscaling**: the ScaledObject and ScaledJob menus write
+the pause annotations the controller reads, the same as `kubectl annotate so <name> ...`:
+
+- **Pause Autoscaling** sets `autoscaling.keda.sh/paused=true`, which freezes a ScaledObject's
+  target at its current replica count (KEDA 2.12 or newer) and stops a ScaledJob from
+  creating Jobs.
+- **Scale to Zero**, for a ScaledObject, sets `autoscaling.keda.sh/paused-replicas=0`, which
+  scales the target down to zero replicas and keeps it there. It asks for confirmation
+  first.
 - **Resume Autoscaling** removes both annotations (a `null` in the merge patch) so the
   controller scales normally again. It is the only item shown while the object is paused.
 
@@ -68,8 +97,8 @@ the top takes a package name, the URL of a tarball, or the path to a tarball or 
 ### From the registry
 
 Enter `freelens-keda-extension` and press Install. Freelens resolves the package from the
-npm registry, exactly like the official extensions. Enable it, and the "Scaled Objects"
-sidebar entry appears on every cluster.
+npm registry, exactly like the official extensions. Enable it, and the "KEDA" sidebar group
+appears on every cluster.
 
 ### From a release tarball
 
@@ -91,25 +120,35 @@ files in `dist/`, and lists it as unverified. This is how you work on the extens
 
    ```powershell
    kubectl apply -f examples/keda/deployments.yaml
+   kubectl apply -f examples/keda/triggerauthentication.yaml
+   kubectl apply -f examples/keda/clustertriggerauthentication.yaml
    kubectl apply -f examples/keda/scaledobject-cpu.yaml
    kubectl apply -f examples/keda/scaledobject-cron.yaml
+   kubectl apply -f examples/keda/scaledjob.yaml
    ```
 
-   `deployments.yaml` creates two Deployments of the pause image, `example-app` and
-   `example-cron`: KEDA accepts one ScaledObject per workload, so each ScaledObject scales a
-   Deployment of its own. `example-app-cpu` keeps `example-app` between 1 and 5 replicas
-   following CPU utilization at 50% (the HPA reads the CPU from metrics-server), and
-   `example-cron` wakes one replica of `example-cron` between 00:30 and 00:45
-   (America/Sao_Paulo) and scales it back to zero.
+   | File                                | Objects                                                                                                                                                      |
+   | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | `deployments.yaml`                  | the Deployments `example-app` and `example-cron`, of the pause image; KEDA accepts one ScaledObject per workload, so each ScaledObject scales one of its own |
+   | `triggerauthentication.yaml`        | the Secret `example-credentials` and the TriggerAuthentication `example-auth`, which passes its `token`                                                      |
+   | `clustertriggerauthentication.yaml` | the ClusterTriggerAuthentication `example-cluster-auth`, which passes the variable `TZ` of the scale target's container                                      |
+   | `scaledobject-cpu.yaml`             | `example-app-cpu`, which keeps `example-app` between 1 and 5 replicas following CPU utilization at 50% (the HPA reads the CPU from metrics-server)           |
+   | `scaledobject-cron.yaml`            | `example-cron`, which wakes one replica of `example-cron` between 00:30 and 00:45 (America/Sao_Paulo), with `example-cluster-auth`                           |
+   | `scaledjob.yaml`                    | `example-job`, which runs one Job at a time in the first ten minutes of every hour, with `example-auth`                                                      |
 
-2. Open the cluster in Freelens. The page lists `example-app-cpu` and `example-cron`; each
-   details panel shows its triggers, and the "Scaling Events" section fills in as the
-   controller reconciles.
+   The cron scaler takes no credentials: the authentication refs of the cron triggers are
+   there for the links between the objects, and resolve without any outside system.
+
+2. Open the cluster in Freelens. The KEDA pages list the objects; each details panel of a
+   ScaledObject or a ScaledJob shows its triggers, and the "Scaling Events" section fills in
+   as the controller reconciles. The details of `example-auth` link to its Secret and to
+   `example-job`.
 
 3. Open the menu of a ScaledObject and click **Pause Autoscaling** (keeps the current
    replicas) or **Scale to Zero** (confirms, then scales to zero); the Status column
    switches to `Paused` once the controller applies the annotation, and
-   **Resume Autoscaling** restores normal scaling.
+   **Resume Autoscaling** restores normal scaling. A ScaledJob pauses and resumes the same
+   way.
 
 ## Development
 
@@ -156,13 +195,18 @@ tsconfig.base.json                               # compiler options shared by ev
 environment-tests/                               # probes that keep Node out of the renderer and the DOM out of main
 src/
   main/index.ts                                  # main entry (stateless)
-  renderer/index.tsx                             # registrations: page, details, menu, customResources
-  renderer/api/types.ts                          # KEDA spec/status types
+  renderer/index.tsx                             # registrations: 4 pages, KEDA group, details, menus, customResources
+  renderer/api/types.ts                          # KEDA spec/status types, from the Go types of KEDA 2.21
+  renderer/api/status-helpers.ts                 # conditions, status lists and pause annotation (ScaledObject, ScaledJob)
+  renderer/api/trigger-authentication.ts         # logic and parameters of both authentication kinds
   renderer/api/events.ts                         # last seen time and order of the events, for both event APIs
-  renderer/api/scaledobject/scaledobject-v1.ts   # ScaledObject model (+ Api, test)
-  renderer/pages/                                # Scaled Objects page + CSS module
-  renderer/details/                              # ScaledObject details panel, Scaling Events
-  renderer/menus/                                # Pause/Scale to Zero/Resume Autoscaling (ScaledObject)
+  renderer/api/scaledobject/scaledobject-v1alpha1.ts   # ScaledObject model (+ Api, test)
+  renderer/api/scaledjob/scaledjob-v1alpha1.ts         # ScaledJob model (+ Api, test)
+  renderer/api/triggerauthentication/triggerauthentication-v1alpha1.ts               # TriggerAuthentication model (+ Api)
+  renderer/api/clustertriggerauthentication/clustertriggerauthentication-v1alpha1.ts # ClusterTriggerAuthentication model (+ Api)
+  renderer/pages/                                # 4 pages + CSS module
+  renderer/details/                              # one panel per kind (one for both authentications), Triggers, Scaling Events
+  renderer/menus/                                # Pause/Scale to Zero/Resume Autoscaling (ScaledObject, ScaledJob)
   renderer/icons/                                # KEDA logo (currentColor)
   renderer/components/                           # createAvailableVersionPage, error boundaries
   common/                                        # code both entries would share (none today; its tsconfig stays)
@@ -177,8 +221,8 @@ stylesheet next to the renderer entry.
 
 ## Supported API versions
 
-The extension supports **`keda.sh/v1alpha1` only**, the version KEDA 2.x serves (one version
-per kind, with the "Not Available" page when the CRD is missing). To add another version
+The extension supports **`keda.sh/v1alpha1` only**, the version KEDA 2.x serves for its four
+kinds (one version per kind, with the "Not Available" page when a CRD is missing). To add another version
 later, follow the same per-version model/page/details pattern and list both versions in
 `createAvailableVersionPage`, newest first.
 

@@ -1,100 +1,79 @@
 import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
-import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
 import { ScalingEvents } from "./scaling-events";
+import { Triggers } from "./triggers";
 
 const { observer } = MobxReact;
 
 const {
-  Component: { Badge, DrawerItem },
+  Component: { DrawerItem, LinkToObject },
 } = Renderer;
 
 export type ScaledObjectDetailsProps = Renderer.Component.KubeObjectDetailsProps<ScaledObject>;
 
-function conditionClass(status: string): string {
-  switch (status) {
-    case "True":
-      return "success";
-    case "False":
-      return "error";
-    default:
-      return "warning";
-  }
-}
+const seconds = (value: number | undefined) => (value === undefined ? "-" : `${value}s`);
 
+/**
+ * The details of a ScaledObject that the host does not show already: the host
+ * shows the printer columns of the CRD (the kind and name of the scale target,
+ * min and max, the Ready, Active, Fallback and Paused conditions, the trigger
+ * and authentication types) and the conditions themselves, with their reasons
+ * and messages.
+ */
 export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProps) => {
-  const conditions = object.status?.conditions;
-  const triggers = object.spec.triggers ?? [];
-  const fallback = object.spec.fallback;
+  const { spec, status } = object;
+  const hpaRef = ScaledObject.getHpaRef(object);
+  const { fallback } = spec;
+  const modifiers = spec.advanced?.scalingModifiers;
+  const health = Object.entries(status?.health ?? {});
 
   return (
     <>
       <DrawerItem name="Scale Target">
-        {ScaledObject.getScaleTarget(object)}
-        {object.spec.scaleTargetRef.apiVersion ? ` (${object.spec.scaleTargetRef.apiVersion})` : ""}
+        <LinkToObject
+          object={object}
+          objectRef={ScaledObject.getScaleTargetRef(object)}
+          content={ScaledObject.getScaleTarget(object)}
+        />
       </DrawerItem>
-      <DrawerItem name="Min Replicas">{object.spec.minReplicaCount ?? "-"}</DrawerItem>
-      <DrawerItem name="Max Replicas">{object.spec.maxReplicaCount ?? "-"}</DrawerItem>
-      <DrawerItem name="Polling Interval">
-        {object.spec.pollingInterval !== undefined ? `${object.spec.pollingInterval}s` : "-"}
+      <DrawerItem name="Horizontal Pod Autoscaler" hidden={!hpaRef}>
+        <LinkToObject object={object} objectRef={hpaRef} />
       </DrawerItem>
-      <DrawerItem name="Cooldown Period">
-        {object.spec.cooldownPeriod !== undefined ? `${object.spec.cooldownPeriod}s` : "-"}
-      </DrawerItem>
-      <DrawerItem name="Idle Replica Count">{object.spec.idleReplicaCount ?? "-"}</DrawerItem>
-      <DrawerItem name="Initial Cooldown Period">
-        {object.spec.initialCooldownPeriod !== undefined ? `${object.spec.initialCooldownPeriod}s` : "-"}
-      </DrawerItem>
+      <DrawerItem name="Polling Interval">{seconds(spec.pollingInterval)}</DrawerItem>
+      <DrawerItem name="Cooldown Period">{seconds(spec.cooldownPeriod)}</DrawerItem>
+      <DrawerItem name="Idle Replica Count">{spec.idleReplicaCount ?? "-"}</DrawerItem>
+      <DrawerItem name="Initial Cooldown Period">{seconds(spec.initialCooldownPeriod)}</DrawerItem>
       <DrawerItem name="Restore To Original">
-        {object.spec.advanced?.restoreToOriginalReplicaCount !== undefined
-          ? String(object.spec.advanced.restoreToOriginalReplicaCount)
+        {spec.advanced?.restoreToOriginalReplicaCount !== undefined
+          ? String(spec.advanced.restoreToOriginalReplicaCount)
           : "-"}
       </DrawerItem>
-      <DrawerItem name="Triggers" labelsOnly hidden={triggers.length === 0}>
-        {triggers.map((trigger, index) => (
-          <DrawerItem
-            key={`${trigger.type}-${trigger.name ?? index}`}
-            name={
-              <>
-                <Badge label={trigger.type} /> {trigger.name}
-              </>
-            }
-          >
-            {trigger.metadata &&
-              Object.entries(trigger.metadata).map(([key, value]) => (
-                <DrawerItem key={key} name={key}>
-                  {value}
-                </DrawerItem>
-              ))}
-            {trigger.authenticationRef && (
-              <DrawerItem name="Authentication Ref">
-                {trigger.authenticationRef.kind ?? "TriggerAuthentication"}/{trigger.authenticationRef.name}
-              </DrawerItem>
-            )}
-          </DrawerItem>
-        ))}
+      <DrawerItem name="Scaling Modifiers" hidden={!modifiers?.formula}>
+        {modifiers?.formula}
+        {modifiers?.target ? `, target ${modifiers.target}` : ""}
+        {modifiers?.activationTarget ? `, activation target ${modifiers.activationTarget}` : ""}
+        {modifiers?.metricType ? ` (${modifiers.metricType})` : ""}
       </DrawerItem>
+      <Triggers object={object} triggers={spec.triggers ?? []} />
       <DrawerItem name="Fallback">
         {fallback
-          ? `enabled (failureThreshold: ${fallback.failureThreshold}, replicas: ${fallback.replicas})`
+          ? `${fallback.replicas} replicas after ${fallback.failureThreshold} failures (${fallback.behavior ?? "static"})`
           : "Disabled"}
       </DrawerItem>
-      <DrawerItem name="Conditions" labelsOnly hidden={!conditions?.length}>
-        {conditions?.map((condition, index) => (
-          <Badge
-            key={condition.type + index}
-            label={condition.reason || condition.type}
-            className={conditionClass(condition.status)}
-            tooltip={condition.message}
-          />
-        ))}
+      <DrawerItem name="Health" hidden={health.length === 0}>
+        {health
+          .map(
+            ([metric, { status: state, numberOfFailures }]) =>
+              `${metric}: ${state ?? "-"}, ${numberOfFailures ?? 0} failures`,
+          )
+          .join("; ")}
       </DrawerItem>
       <DrawerItem name="External Metric Names">
         {ScaledObject.getExternalMetricNames(object).join(", ") || "-"}
       </DrawerItem>
-      <DrawerItem name="Original Replica Count">{object.status?.originalReplicaCount ?? "-"}</DrawerItem>
-      <DrawerItem name="Last Active Time">{object.status?.lastActiveTime ?? "-"}</DrawerItem>
-      <DrawerItem name="Paused">{ScaledObject.getPausedAnnotation(object) ? "Yes" : "No"}</DrawerItem>
+      <DrawerItem name="Original Replica Count">{status?.originalReplicaCount ?? "-"}</DrawerItem>
+      <DrawerItem name="Last Active Time">{status?.lastActiveTime ?? "-"}</DrawerItem>
       <ScalingEvents object={object} />
     </>
   );

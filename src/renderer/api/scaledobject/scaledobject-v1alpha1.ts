@@ -1,6 +1,15 @@
 import { Renderer } from "@freelensapp/extensions";
+import {
+  getConditionStatus,
+  getStatusClass,
+  getStatusText,
+  isPausedValue,
+  normalizeList,
+  pausedAnnotation,
+  pausedReplicasAnnotation,
+} from "../status-helpers";
 
-import type { KedaCondition, KedaKubeObjectCRD, ScaledObjectSpec, ScaledObjectStatus } from "../types";
+import type { KedaKubeObjectCRD, ScaledObjectSpec, ScaledObjectStatus } from "../types";
 
 export type { ScaledObjectSpec, ScaledObjectStatus };
 
@@ -29,75 +38,37 @@ export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
     title: "Scaled Objects",
   };
 
-  static getCondition(object: ScaledObject, type: string): KedaCondition | undefined {
-    return object.status?.conditions?.find((condition) => condition.type === type);
-  }
-
   /**
    * The READY column of `kubectl get so`, from the Ready condition.
    */
   static getReady(object: ScaledObject): boolean | undefined {
-    const condition = ScaledObject.getCondition(object, "Ready");
-    if (condition?.status === "True") return true;
-    if (condition?.status === "False") return false;
-    return undefined;
+    return getConditionStatus(object.status?.conditions, "Ready");
   }
 
   /**
    * From the Active condition: whether a trigger currently reports activity.
    */
   static getActive(object: ScaledObject): boolean | undefined {
-    const condition = ScaledObject.getCondition(object, "Active");
-    if (condition?.status === "True") return true;
-    if (condition?.status === "False") return false;
-    return undefined;
+    return getConditionStatus(object.status?.conditions, "Active");
   }
 
   /**
    * From the Fallback condition: whether the fallback replicas are in use.
    */
   static getFallback(object: ScaledObject): boolean | undefined {
-    const condition = ScaledObject.getCondition(object, "Fallback");
-    if (condition?.status === "True") return true;
-    if (condition?.status === "False") return false;
-    return undefined;
+    return getConditionStatus(object.status?.conditions, "Fallback");
   }
 
   /**
-   * From the Paused condition: whether the `autoscaling.keda.sh/paused-replicas`
-   * annotation is in effect. The controller writes no Paused condition while
-   * the object is not paused (an Unknown status means the same here).
-   */
-  static getPaused(object: ScaledObject): boolean | undefined {
-    const condition = ScaledObject.getCondition(object, "Paused");
-    if (condition?.status === "True") return true;
-    if (condition?.status === "False") return false;
-    return undefined;
-  }
-
-  /**
-   * The STATUS column of `kubectl get so`, following the controller's
-   * precedence: an error of the Ready condition wins, then Paused, Fallback,
-   * Active and Ready.
+   * The Status column: the conditions summed up with the controller's
+   * precedence (`getStatusText` of the status helpers).
    */
   static getStatusText(object: ScaledObject): string {
-    if (ScaledObject.getReady(object) === false) {
-      return ScaledObject.getCondition(object, "Ready")?.reason ?? "Error";
-    }
-    if (ScaledObject.getPaused(object)) return "Paused";
-    if (ScaledObject.getFallback(object)) return "Fallback";
-    if (ScaledObject.getActive(object)) return "Active";
-    if (ScaledObject.getReady(object)) return "Ready";
-    return "Unknown";
+    return getStatusText(object.status?.conditions);
   }
 
   static getStatusClass(object: ScaledObject): string {
-    if (ScaledObject.getReady(object) === false) return "error";
-    if (ScaledObject.getFallback(object)) return "warning";
-    if (ScaledObject.getPaused(object)) return "info";
-    if (ScaledObject.getActive(object)) return "success";
-    if (ScaledObject.getReady(object)) return "success";
-    return "";
+    return getStatusClass(object.status?.conditions);
   }
 
   /**
@@ -123,8 +94,34 @@ export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
     return `${ScaledObject.getScaleTargetKind(object)}/${object.spec.scaleTargetRef.name}`;
   }
 
-  static getScaleTargetName(object: ScaledObject): string {
-    return object.spec.scaleTargetRef.name;
+  /**
+   * The workload the object scales, as a reference for a link to it. The
+   * controller resolves its group and version into the status
+   * (`scaleTargetGVKR`); until then they are the apiVersion of the spec, or
+   * `apps/v1`, the controller's default when the spec omits it. The host's
+   * link needs the apiVersion: it looks the API up by kind and apiVersion, and
+   * without one makes up a link under `v1`, where no workload is.
+   */
+  static getScaleTargetRef(object: ScaledObject): Renderer.K8sApi.ObjectReference {
+    const gvkr = object.status?.scaleTargetGVKR;
+
+    return {
+      kind: ScaledObject.getScaleTargetKind(object),
+      name: object.spec.scaleTargetRef.name,
+      apiVersion: gvkr
+        ? [gvkr.group, gvkr.version].filter(Boolean).join("/")
+        : (object.spec.scaleTargetRef.apiVersion ?? "apps/v1"),
+    };
+  }
+
+  /**
+   * The HorizontalPodAutoscaler the controller created for the object, as a
+   * reference for a link to it, once the controller has written its name into
+   * the status.
+   */
+  static getHpaRef(object: ScaledObject): Renderer.K8sApi.ObjectReference | undefined {
+    const name = object.status?.hpaName;
+    return name ? { kind: "HorizontalPodAutoscaler", apiVersion: "autoscaling/v2", name } : undefined;
   }
 
   static getMin(object: ScaledObject): number | undefined {
@@ -135,37 +132,12 @@ export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
     return object.spec.maxReplicaCount;
   }
 
-  static getPollingInterval(object: ScaledObject): number | undefined {
-    return object.spec.pollingInterval;
-  }
-
-  static getCooldownPeriod(object: ScaledObject): number | undefined {
-    return object.spec.cooldownPeriod;
-  }
-
-  /**
-   * Normalizes a status list field: KEDA versions differ on the JSON shape of
-   * these fields, recent releases write an array, older ones a comma-separated
-   * string ("cpu,memory"). An array passes through, a string is split, and a
-   * missing value yields the fallback (the spec-derived list, or empty).
-   */
-  private static normalizeList(value: string | string[] | null | undefined, fallback: string[]): string[] {
-    if (Array.isArray(value)) return value;
-    if (typeof value === "string") {
-      return value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-    return fallback;
-  }
-
   /**
    * The TRIGGERS column of `kubectl get so`: the scaler types, preferring the
    * list the controller wrote into the status over the one in the spec.
    */
   static getTriggerTypes(object: ScaledObject): string[] {
-    return ScaledObject.normalizeList(
+    return normalizeList(
       object.status?.triggersTypes,
       object.spec.triggers.map((trigger) => trigger.type),
     );
@@ -176,30 +148,28 @@ export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
   }
 
   static getAuthenticationTypes(object: ScaledObject): string[] {
-    return ScaledObject.normalizeList(object.status?.authenticationsTypes, []);
+    return normalizeList(object.status?.authenticationsTypes, []);
   }
 
   static getExternalMetricNames(object: ScaledObject): string[] {
-    return ScaledObject.normalizeList(object.status?.externalMetricNames, []);
+    return normalizeList(object.status?.externalMetricNames, []);
   }
 
   /** Pauses the target at its current replica count when "true" (KEDA 2.12 or newer). */
-  static readonly pausedAnnotation = "autoscaling.keda.sh/paused";
+  static readonly pausedAnnotation = pausedAnnotation;
 
   /** Pauses the target at the given replica count; wins over `pausedAnnotation` when both are set. */
-  static readonly pausedReplicasAnnotation = "autoscaling.keda.sh/paused-replicas";
+  static readonly pausedReplicasAnnotation = pausedReplicasAnnotation;
 
   /**
    * Whether one of the pause annotations is in effect on the object, which is
-   * what the menu items write. The controller parses `paused` as a boolean
-   * (`strconv.ParseBool`) and treats a value it cannot parse as paused, so
-   * only its false spellings count as not paused.
+   * what the menu items write: `paused-replicas` with any value, or `paused`
+   * with a value the controller reads as true (`isPausedValue`).
    */
   static getPausedAnnotation(object: ScaledObject): boolean {
     const annotations = object.metadata.annotations ?? {};
     if (ScaledObject.pausedReplicasAnnotation in annotations) return true;
-    const paused = annotations[ScaledObject.pausedAnnotation];
-    return paused !== undefined && !["0", "f", "false"].includes(paused.toLowerCase());
+    return isPausedValue(annotations[ScaledObject.pausedAnnotation]);
   }
 }
 

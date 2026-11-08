@@ -7,10 +7,13 @@ This file provides guidance to coding agents when working with code in this repo
 ## Project Overview
 
 A Freelens extension for KEDA (Kubernetes Event-driven Autoscaling): a list
-page with the columns of `kubectl get so`, a details panel with the triggers
-and the object's scaling events, and the Pause Autoscaling, Scale to Zero and
-Resume Autoscaling menu items, for the ScaledObject kind of `keda.sh/v1alpha1`
-(KEDA 2.x).
+page and a details panel for the four kinds of `keda.sh/v1alpha1` (KEDA 2.x),
+ScaledObject, ScaledJob, TriggerAuthentication and
+ClusterTriggerAuthentication, under a KEDA group in the sidebar. The panels of
+ScaledObject and ScaledJob show their triggers and scaling events, those of
+the two authentication kinds every parameter and where it comes from, and
+ScaledObject and ScaledJob get the Pause Autoscaling and Resume Autoscaling
+menu items, with Scale to Zero for a ScaledObject.
 
 - **Language**: TypeScript 7.x
 - **Runtime**: Freelens >= 2.0.0 (extension API v2, `engines.freelens: ^2.0.0`).
@@ -85,13 +88,15 @@ pnpm clean:all            # Clean everything (dist, dts, node_modules, tgz)
 ```text
 src/
   main/index.ts                      # Main entry (Main.LensExtension), stateless
-  renderer/index.tsx                 # Renderer entry: page, details panel, menu items, customResources
+  renderer/index.tsx                 # Renderer entry: pages, sidebar group, details panels, menu items, customResources
   renderer/api/types.ts              # KEDA spec and status types
+  renderer/api/status-helpers.ts     # Conditions, status lists and the pause annotation, for ScaledObject and ScaledJob
+  renderer/api/trigger-authentication.ts # The logic of both trigger authentication kinds, and their parameters
   renderer/api/events.ts             # When an event was last seen, and the newest events, for both event APIs
   renderer/api/<kind>/<kind>-<version>.ts # Model and KubeApi of a kind, with its tests
-  renderer/pages/                    # The Scaled Objects list page and its CSS module
-  renderer/details/                  # ScaledObjectDetails with the triggers, and ScalingEvents
-  renderer/menus/                    # Pause Autoscaling, Scale to Zero and Resume Autoscaling
+  renderer/pages/                    # One list page per kind, both authentication kinds in one file, and their CSS module
+  renderer/details/                  # One panel per kind, one for both authentication kinds, Triggers, ScalingEvents
+  renderer/menus/                    # PauseMenuItem: Pause, Scale to Zero and Resume, for ScaledObject and ScaledJob
   renderer/components/               # createAvailableVersionPage, ErrorBoundary and its wrappers, ErrorPage
   renderer/icons/                    # The SVG icon, imported with ?raw, and its component
   renderer/vars.scss                 # SCSS variables
@@ -100,7 +105,7 @@ test/freelens-extensions.ts          # Runtime stub of @freelensapp/extensions f
 environment-tests/                   # Probes for the per-environment programs
 build/                               # Vite plugins: host modules, standard decorators, CSS module declarations
 vite.config.mjs                      # The build, renderer and main
-examples/keda/                       # Test objects: two Deployments and a ScaledObject for each (kubectl apply -f)
+examples/keda/                       # Test objects of the four kinds, and the Deployments they scale (kubectl apply -f)
 ```
 
 Build output goes to `dist/`: `main.js`, `renderer.js` and `renderer.css`, with
@@ -109,7 +114,10 @@ source maps. `main` and `renderer` in `package.json` point at the two entries.
 ## CRD KubeObject Pattern
 
 A model is a subclass of `Renderer.K8sApi.LensExtensionKubeObject`, one file
-per kind and version: `src/renderer/api/scaledobject/scaledobject-v1.ts`.
+per kind and version: `src/renderer/api/scaledobject/scaledobject-v1alpha1.ts`,
+`scaledjob/scaledjob-v1alpha1.ts`,
+`triggerauthentication/triggerauthentication-v1alpha1.ts` and
+`clustertriggerauthentication/clustertriggerauthentication-v1alpha1.ts`.
 
 The host reads the model's metadata from the class, through `static readonly`
 properties. The objects it hands to the extension, in a list, a details panel
@@ -129,15 +137,19 @@ is not, and calling it throws. So:
   for the other version ("Renderer Components"). `declare` emits nothing, so
   the runtime object is the host's as before.
 - **Per-object logic**: a `static` method that takes the object, such as
-  `ScaledObject.getStatusText(object)`. The statics read the conditions the
-  controller writes (`Ready`, `Active`, `Fallback`, `Paused`) and sum them up
-  in the Status column with the controller's precedence: an error of Ready,
-  then Paused, Fallback, Active and Ready. `getScaleTargetKind` takes the kind
+  `ScaledObject.getStatusText(object)`. The statics of ScaledObject and
+  ScaledJob delegate to `status-helpers.ts`, which reads the conditions the
+  controller writes (`Ready`, `Active`, `Fallback`, `Paused`) and sums them
+  up in the Status column with the controller's precedence: an error of Ready,
+  then Paused, Fallback, Active and Ready; a ScaledJob has no Fallback. `getScaleTargetKind` takes the kind
   out of the GVK string the controller resolves into the status
   (`apps/v1.Deployment`), and falls back to the kind of the spec for an object
   the controller has not resolved, or rejected. `getTriggerTypes` and
   `getExternalMetricNames` normalize the status list fields that KEDA versions
-  write either as an array or as a comma-separated string.
+  write either as an array or as a comma-separated string. TriggerAuthentication
+  and ClusterTriggerAuthentication share their spec and status, so their logic
+  is in `trigger-authentication.ts`, functions that take either kind, which the
+  pages and the panel call directly; the two models carry their metadata only.
 - **Constants**: the annotations the controller reads are `static readonly`
   on the model (`pausedAnnotation`, `pausedReplicasAnnotation`); the menu
   items and `getPausedAnnotation` use them, never the literal.
@@ -169,10 +181,7 @@ export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
   };
 
   static getReady(object: ScaledObject): boolean | undefined {
-    const condition = ScaledObject.getCondition(object, "Ready");
-    if (condition?.status === "True") return true;
-    if (condition?.status === "False") return false;
-    return undefined;
+    return getConditionStatus(object.status?.conditions, "Ready");
   }
 }
 
@@ -199,12 +208,13 @@ served. Freelens restores the last page when a cluster is opened, so this
 happens often. `src/renderer/components/available-version.test.tsx` checks it
 with a spy on `getStore` that reads an observable.
 
-`customResources` in `src/renderer/index.tsx` lists the model class. The host
-reads the group and plural from the class's `crd`, and while the extension is
-enabled it leaves the resource out of the Custom Resources tree of the cluster
-sidebar, where it would otherwise be listed a second time under `keda.sh`. Its
-definition stays in the Definitions list, and the host's own list and details
-stay reachable by URL and from the command palette. A model the extension only
+`customResources` in `src/renderer/index.tsx` lists the four model classes.
+The host reads the group and plural from each class's `crd`, and while the
+extension is enabled it leaves the resources out of the Custom Resources tree
+of the cluster sidebar, where they would otherwise be listed a second time
+under `keda.sh`. Their definitions stay in the Definitions list, and the
+host's own list and details stay reachable by URL and from the command
+palette. A model the extension only
 decorates, with a details panel or a menu item and no page of its own, stays
 out of the field: registered, it would leave the tree with nothing in its
 place.
@@ -213,7 +223,7 @@ place.
 
 The types in `src/renderer/api/types.ts` follow the KEDA controller's Go types,
 read from its sources at the release that serves the version
-(`apis/keda/v1alpha1/scaledobject_types.go` of kedacore/keda), not from
+(`apis/keda/v1alpha1/*_types.go` of kedacore/keda, v2.21.0 today), not from
 memory:
 
 - Every Go struct has a TypeScript interface of the same name, with the same
@@ -225,9 +235,16 @@ memory:
 - `spec.triggers[].metadata` is an open record of strings: each of the 70+
   scalers has its own keys.
 - `status.triggersTypes`, `status.authenticationsTypes` and
-  `status.externalMetricNames` are typed `string | string[]`: recent KEDA
-  releases write arrays, older ones a comma-separated string. The model's
-  statics normalize them; nothing else reads them directly.
+  `status.externalMetricNames` are typed `string | string[]`: KEDA 2.21 writes
+  the types as one comma-separated string and the metric names as an array,
+  and the shapes have changed between releases. The models' statics normalize
+  them; nothing else reads them directly.
+- A type of Kubernetes itself comes from `K8sApi`: `jobTargetRef` of a
+  ScaledJob is the host's `JobSpec`, and the HPA behavior of a ScaledObject
+  is `HorizontalPodAutoscalerSpec["behavior"]`.
+- TriggerAuthentication and ClusterTriggerAuthentication share
+  `TriggerAuthenticationSpec` and `TriggerAuthenticationStatus`, as their Go
+  types do.
 - A condition is `Renderer.K8sApi.BaseKubeObjectCondition`, aliased as
   `KedaCondition`. The whole of the host's kube-object package is re-exported
   from `K8sApi`; nothing is imported from another `@freelensapp/*` package,
@@ -242,15 +259,18 @@ memory:
    `declare kind` and `declare apiVersion` literals and its `KubeApi`.
 3. **The list page** in `src/renderer/pages/`, passed through
    `createAvailableVersionPage` (newest version first when a kind has more than
-   one) and registered in `clusterPages` and `clusterPageMenus`.
+   one) and registered in `clusterPages` and in `clusterPageMenus`, under the
+   KEDA group (`parentId: "keda"`).
 4. **The details panel** in `src/renderer/details/`, registered in
    `kubeObjectDetailItems` with `Renderer.K8sApi.detailsFor` and the model
-   class.
+   class, with only what the host does not show already ("Renderer
+   Components").
 5. **Menu items** in `src/renderer/menus/`, registered in `kubeObjectMenuItems`
    with `Renderer.K8sApi.menuItemFor` and the model class, only for what the
-   resource supports: the pause items write the `autoscaling.keda.sh/paused`
-   and `autoscaling.keda.sh/paused-replicas` annotations, which the KEDA
-   controller reads, and remove both to resume. An action that changes the
+   resource supports: `PauseMenuItem` writes the `autoscaling.keda.sh/paused`
+   annotation, which the KEDA controller reads for ScaledObject and ScaledJob,
+   and `autoscaling.keda.sh/paused-replicas`, which it reads for a ScaledObject
+   only, and removes both to resume. An action that changes the
    workload, such as Scale to Zero, asks first with
    `Renderer.Component.ConfirmDialog.open`, as the host does before deleting an
    object.
@@ -301,16 +321,35 @@ from the Custom Resources tree.
   two kinds or versions apart by the `declare kind` and `declare apiVersion`
   literals of each model ("CRD KubeObject Pattern").
 - The components are registered as they are, `Details: ScaledObjectDetails`
-  and `MenuItem: ScaledObjectPauseMenuItem`. Their props are
+  and `MenuItem: PauseMenuItem`. Their props are
   `Renderer.Component.KubeObjectDetailsProps<Model>` and
   `Common.Types.KubeObjectMenuItemProps<Model>`: the concrete model class, never
   `any`, and only what the host passes. A menu item does not extend
   `Renderer.Component.KubeObjectMenuProps`, the props of the host's whole
-  `KubeObjectMenu`. One menu item component renders the items that apply to
-  the object's state, in a fragment: Pause Autoscaling and Scale to Zero while
-  it is not paused, Resume Autoscaling while it is.
-- The details panel lists the object's core Events, the scaling decisions and
-  errors the controller records, with `ScalingEvents`
+  `KubeObjectMenu`. A component may take the union of the models it serves:
+  `TriggerAuthenticationDetails` serves both authentication kinds, and
+  `PauseMenuItem` serves ScaledObject and ScaledJob, picking the store to patch
+  by the `kind` of the object, a literal on each model. It renders the items
+  that apply to the object's kind and state, in a fragment: Pause Autoscaling,
+  and Scale to Zero for a ScaledObject, while it is not paused, Resume
+  Autoscaling while it is.
+- A details panel shows only what the host does not. For any custom resource
+  the host renders `CustomResourceDetails` in the same drawer, with every
+  printer column of the CRD and the conditions, reasons and messages
+  included, and its Events section at the end. A field of a printer column
+  comes back in a panel only as more than its value, such as the scale target
+  as a link to the workload.
+- The list pages are configurable, as the host's own lists: every column has
+  an `id`, `isConfigurable` turns on the column menu of the table, which hides
+  and shows columns, and the host keeps the choice per `tableId`.
+  `defaultHiddenTableColumns` hides the columns that another one sums up
+  (Ready, Active and Fallback, which Status sums up) or that `kubectl get`
+  shows with `-o wide` only, so that a list fits a narrow window.
+- `clusterPageMenus` has one KEDA group, with the KEDA icon, which opens the
+  Scaled Objects page, and one entry per kind under it, by `parentId`.
+- The panels of ScaledObject and ScaledJob share `Triggers`, the list of their
+  scalers, and list the object's core Events, the scaling decisions and errors
+  the controller records, with `ScalingEvents`
   (`src/renderer/details/scaling-events.tsx`). It reads
   `Renderer.K8sApi.eventStore.getEventsByObject(object)`, which matches the
   events by the object's uid; the host loads and watches that store for the
@@ -319,6 +358,17 @@ from the Custom Resources tree.
   `kubectl get events` reads it: KEDA 2.21 records events through the
   events.k8s.io/v1 API, which writes `eventTime` and `series` and leaves
   `lastTimestamp` empty, and older releases through core/v1.
+- A link to another object is `Renderer.Component.LinkToObject`, with an
+  `objectRef` of its kind, name and apiVersion and the object of the panel,
+  whose namespace it takes: the host finds the API of the kind, one of its own
+  or one it registered for a CRD, and links to the details of the object.
+  Nothing loads another store for a link. The ScaledObject panel links its
+  scale target (`getScaleTargetRef`, with the group and version the controller
+  resolves into `status.scaleTargetGVKR`) and its HPA (`getHpaRef`, from
+  `status.hpaName`), and `Triggers` links the authentication of each trigger
+  (`getAuthenticationObjectRef`). A ClusterTriggerAuthentication names
+  Secrets in the namespace of the operator, which the object does not say, and
+  is used by objects in any namespace, so its panel shows those names as text.
 - `Renderer.Component.ConfirmDialog` lays its content out as flex items, so its
   `message` is one element, `<p>...</p>` ("Rules That Fail Silently").
 - The host renders a cluster page with `params` only. A page that needs the

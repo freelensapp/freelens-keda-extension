@@ -1,0 +1,21 @@
+# A TriggerAuthentication that passes the parameter "token" from a Secret in its
+# namespace. The ScaledJob example-job refers to it, which fills its status and
+# the links of both details panels.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-credentials
+  namespace: default
+stringData:
+  token: not-a-real-token
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: example-auth
+  namespace: default
+spec:
+  secretTargetRef:
+  - parameter: token
+    name: example-credentials
+    key: token

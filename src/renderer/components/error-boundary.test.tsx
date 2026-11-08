@@ -3,7 +3,7 @@
 import { Common, type Renderer } from "@freelensapp/extensions";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
 import { ScaledObjectsPage } from "../pages/scaled-objects-page";
 import {
   ErrorBoundary,
@@ -131,7 +131,7 @@ describe("the registration wrappers", () => {
       apiVersion: "keda.sh/v1alpha1",
       kind: "ScaledObject",
       metadata: { name: "example-app", namespace: "default", uid: "1", resourceVersion: "1", selfLink: "" },
-      spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+      spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
     });
     vi.spyOn(ScaledObject, "getStore").mockReturnValue({
       items: [object],

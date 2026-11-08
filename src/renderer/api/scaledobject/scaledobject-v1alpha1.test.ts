@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ScaledObject } from "./scaledobject-v1";
+import { ScaledObject } from "./scaledobject-v1alpha1";
 
 // `@freelensapp/extensions` is stubbed for tests (see `test/freelens-extensions.ts`),
 // which lets us construct a real `ScaledObject` instance from plain resource data.
@@ -29,7 +29,7 @@ describe("ScaledObject (v1alpha1)", () => {
   });
 
   describe("getStatusText", () => {
-    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] };
+    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] };
 
     it("returns the reason of a Ready condition with status False", () => {
       const object = buildScaledObject(spec, {
@@ -84,7 +84,7 @@ describe("ScaledObject (v1alpha1)", () => {
   });
 
   describe("getStatusClass", () => {
-    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] };
+    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] };
 
     it("maps a False Ready condition to error", () => {
       const object = buildScaledObject(spec, { conditions: [{ type: "Ready", status: "False" }] });
@@ -135,14 +135,17 @@ describe("ScaledObject (v1alpha1)", () => {
     it("joins the trigger types of the spec", () => {
       const object = buildScaledObject({
         scaleTargetRef: { name: "example-app" },
-        triggers: [{ type: "cpu" }, { type: "cron", metadata: { desired: "1" } }],
+        triggers: [
+          { type: "cpu", metadata: {} },
+          { type: "cron", metadata: { desired: "1" } },
+        ],
       });
       expect(ScaledObject.getTriggerSummary(object)).toBe("cpu, cron");
     });
 
     it("prefers the trigger types the controller wrote into the status", () => {
       const object = buildScaledObject(
-        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
         { triggersTypes: ["cpu", "memory"] },
       );
       expect(ScaledObject.getTriggerSummary(object)).toBe("cpu, memory");
@@ -150,7 +153,7 @@ describe("ScaledObject (v1alpha1)", () => {
 
     it("splits the comma-separated string some KEDA versions write into the status", () => {
       const object = buildScaledObject(
-        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
         { triggersTypes: "cpu,memory,prometheus" },
       );
       expect(ScaledObject.getTriggerTypes(object)).toEqual(["cpu", "memory", "prometheus"]);
@@ -159,7 +162,7 @@ describe("ScaledObject (v1alpha1)", () => {
 
     it("trims and drops empty items of a string status value", () => {
       const object = buildScaledObject(
-        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
         { triggersTypes: " cpu , ,cron " },
       );
       expect(ScaledObject.getTriggerTypes(object)).toEqual(["cpu", "cron"]);
@@ -167,7 +170,7 @@ describe("ScaledObject (v1alpha1)", () => {
 
     it("falls back to the spec triggers when the status has no types", () => {
       const object = buildScaledObject(
-        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
         { triggersTypes: undefined },
       );
       expect(ScaledObject.getTriggerSummary(object)).toBe("cpu");
@@ -178,7 +181,7 @@ describe("ScaledObject (v1alpha1)", () => {
     // The controller writes the resolved kind as a GVK string, `<group>/<version>.<kind>`.
     it("takes the kind out of the GVK the controller resolved in the status", () => {
       const object = buildScaledObject(
-        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
         { scaleTargetKind: "apps/v1.Deployment" },
       );
       expect(ScaledObject.getScaleTargetKind(object)).toBe("Deployment");
@@ -189,7 +192,7 @@ describe("ScaledObject (v1alpha1)", () => {
       const object = buildScaledObject(
         {
           scaleTargetRef: { name: "example-app", apiVersion: "argoproj.io/v1alpha1", kind: "Rollout" },
-          triggers: [{ type: "cpu" }],
+          triggers: [{ type: "cpu", metadata: {} }],
         },
         { scaleTargetKind: "argoproj.io/v1alpha1.Rollout" },
       );
@@ -200,12 +203,12 @@ describe("ScaledObject (v1alpha1)", () => {
     // resolved kind, and reads the same as one it accepted.
     it("reads the same before the controller has resolved the kind", () => {
       const resolved = buildScaledObject(
-        { scaleTargetRef: { name: "example-app", kind: "Deployment" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetRef: { name: "example-app", kind: "Deployment" }, triggers: [{ type: "cpu", metadata: {} }] },
         { scaleTargetKind: "apps/v1.Deployment" },
       );
       const unresolved = buildScaledObject({
         scaleTargetRef: { name: "example-app", kind: "Deployment" },
-        triggers: [{ type: "cpu" }],
+        triggers: [{ type: "cpu", metadata: {} }],
       });
       expect(ScaledObject.getScaleTarget(unresolved)).toBe(ScaledObject.getScaleTarget(resolved));
     });
@@ -213,21 +216,96 @@ describe("ScaledObject (v1alpha1)", () => {
     it("uses the kind of the spec when the status has none", () => {
       const object = buildScaledObject({
         scaleTargetRef: { name: "example-app", kind: "Deployment" },
-        triggers: [{ type: "cpu" }],
+        triggers: [{ type: "cpu", metadata: {} }],
       });
       expect(ScaledObject.getScaleTarget(object)).toBe("Deployment/example-app");
     });
 
     it("defaults the kind to Deployment", () => {
-      const object = buildScaledObject({ scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] });
+      const object = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
       expect(ScaledObject.getScaleTarget(object)).toBe("Deployment/example-app");
+    });
+  });
+
+  describe("getScaleTargetRef", () => {
+    it("refers to the workload by the group and version the controller resolved", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        {
+          scaleTargetKind: "apps/v1.Deployment",
+          scaleTargetGVKR: { group: "apps", version: "v1", kind: "Deployment", resource: "deployments" },
+        },
+      );
+      expect(ScaledObject.getScaleTargetRef(object)).toEqual({
+        kind: "Deployment",
+        name: "example-app",
+        apiVersion: "apps/v1",
+      });
+    });
+
+    it("leaves the empty group of a core kind out of the apiVersion", () => {
+      const object = buildScaledObject(
+        {
+          scaleTargetRef: { name: "example-rc", kind: "ReplicationController" },
+          triggers: [{ type: "cpu", metadata: {} }],
+        },
+        {
+          scaleTargetGVKR: {
+            group: "",
+            version: "v1",
+            kind: "ReplicationController",
+            resource: "replicationcontrollers",
+          },
+        },
+      );
+      expect(ScaledObject.getScaleTargetRef(object).apiVersion).toBe("v1");
+    });
+
+    it("takes the apiVersion of the spec before the controller has resolved it, or the default apps/v1", () => {
+      const rollout = buildScaledObject({
+        scaleTargetRef: { name: "example-app", apiVersion: "argoproj.io/v1alpha1", kind: "Rollout" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      const deployment = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      expect(ScaledObject.getScaleTargetRef(rollout)).toEqual({
+        kind: "Rollout",
+        name: "example-app",
+        apiVersion: "argoproj.io/v1alpha1",
+      });
+      expect(ScaledObject.getScaleTargetRef(deployment)).toEqual({
+        kind: "Deployment",
+        name: "example-app",
+        apiVersion: "apps/v1",
+      });
+    });
+  });
+
+  describe("getHpaRef", () => {
+    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] };
+
+    it("refers to the HPA the controller named in the status", () => {
+      expect(ScaledObject.getHpaRef(buildScaledObject(spec, { hpaName: "keda-hpa-example-app-cpu" }))).toEqual({
+        kind: "HorizontalPodAutoscaler",
+        apiVersion: "autoscaling/v2",
+        name: "keda-hpa-example-app-cpu",
+      });
+    });
+
+    it("is undefined until the controller has created the HPA", () => {
+      expect(ScaledObject.getHpaRef(buildScaledObject(spec))).toBeUndefined();
     });
   });
 
   describe("status list normalization", () => {
     it("splits string authentication types and metric names", () => {
       const object = buildScaledObject(
-        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
         { authenticationsTypes: "aws-keda-auth", externalMetricNames: "s0-cpu,s0-memory" },
       );
       expect(ScaledObject.getAuthenticationTypes(object)).toEqual(["aws-keda-auth"]);
@@ -235,7 +313,10 @@ describe("ScaledObject (v1alpha1)", () => {
     });
 
     it("returns an empty list when the status has none", () => {
-      const object = buildScaledObject({ scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] });
+      const object = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
       expect(ScaledObject.getAuthenticationTypes(object)).toEqual([]);
       expect(ScaledObject.getExternalMetricNames(object)).toEqual([]);
     });
@@ -252,7 +333,7 @@ describe("ScaledObject (v1alpha1)", () => {
           selfLink: "/apis/keda.sh/v1alpha1/namespaces/default/scaledobjects/example-app",
           annotations,
         },
-        spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
+        spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
       });
 
     it("is true when the paused-replicas annotation is present", () => {
@@ -272,7 +353,10 @@ describe("ScaledObject (v1alpha1)", () => {
     });
 
     it("is false when the annotation is absent", () => {
-      const object = buildScaledObject({ scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] });
+      const object = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
       expect(ScaledObject.getPausedAnnotation(object)).toBe(false);
     });
   });
