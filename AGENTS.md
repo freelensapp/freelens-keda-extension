@@ -87,9 +87,10 @@ src/
   main/index.ts                      # Main entry (Main.LensExtension), stateless
   renderer/index.tsx                 # Renderer entry: page, details panel, menu items, customResources
   renderer/api/types.ts              # KEDA spec and status types
+  renderer/api/events.ts             # When an event was last seen, and the newest events, for both event APIs
   renderer/api/<kind>/<kind>-<version>.ts # Model and KubeApi of a kind, with its tests
   renderer/pages/                    # The Scaled Objects list page and its CSS module
-  renderer/details/                  # ScaledObjectDetails, with the triggers and the scaling events
+  renderer/details/                  # ScaledObjectDetails with the triggers, and ScalingEvents
   renderer/menus/                    # Pause Autoscaling, Scale to Zero and Resume Autoscaling
   renderer/components/               # createAvailableVersionPage, ErrorBoundary and its wrappers, ErrorPage
   renderer/icons/                    # The SVG icon, imported with ?raw, and its component
@@ -303,9 +304,16 @@ from the Custom Resources tree.
   `KubeObjectMenu`. One menu item component renders the items that apply to
   the object's state, in a fragment: Pause Autoscaling and Scale to Zero while
   it is not paused, Resume Autoscaling while it is.
-- The details panel lists the object's core Events (the scaling decisions the
-  controller records) from the host's event store, newest first; the section
-  is left out while the host serves no event store.
+- The details panel lists the object's core Events, the scaling decisions and
+  errors the controller records, with `ScalingEvents`
+  (`src/renderer/details/scaling-events.tsx`). It reads
+  `Renderer.K8sApi.eventStore.getEventsByObject(object)`, which matches the
+  events by the object's uid; the host loads and watches that store for the
+  Events section it adds at the end of every drawer. When an event was last
+  seen comes from `getEventLastSeen` in `src/renderer/api/events.ts`, as
+  `kubectl get events` reads it: KEDA 2.21 records events through the
+  events.k8s.io/v1 API, which writes `eventTime` and `series` and leaves
+  `lastTimestamp` empty, and older releases through core/v1.
 - `Renderer.Component.ConfirmDialog` lays its content out as flex items, so its
   `message` is one element, `<p>...</p>` ("Rules That Fail Silently").
 - The host renders a cluster page with `params` only. A page that needs the
@@ -383,7 +391,8 @@ or not visibly at all.
   them.** The host keeps one observable array per store and updates it in
   place, so `store.items` stays the same array while the objects change. An
   `observer` that reads the items while it renders follows them; a `useMemo`
-  keyed on the array is computed once.
+  keyed on the array is computed once. A list built from them for display is
+  a sorted copy (`toSorted`), never the store's array sorted in place.
 - **A merge patch removes an annotation with `null`.** The host's patch type
   admits `string | undefined` only, and `undefined` drops the key from the
   JSON, so the annotation stays. The menu items cast the annotations once, in

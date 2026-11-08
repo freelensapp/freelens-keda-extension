@@ -33,9 +33,10 @@ Each ScaledObject also gets a details panel in the drawer:
 - **Triggers**: one section per scaler, with its type as a badge, its name, its metadata
   as key/value sub-items and its authentication ref.
 - **Scaling Events**: the events the cluster records for the object (KEDA writes one per
-  scaling decision), read from the host's core event store and shown as a table — Type,
-  Reason, Message, Count and Last Seen — newest first, up to 20. The section is omitted
-  when the event store is unavailable and shows "No events" when the object has none.
+  scaling decision), read from the host's event store and shown as a table — Type, Reason,
+  Message, Count and Last Seen — newest first, up to 20. Last Seen and Count read both event
+  APIs: the `lastTimestamp` and `count` of KEDA 2.20 and older, and the `eventTime` and
+  `series` of the `events.k8s.io/v1` API that KEDA 2.21 records through.
 - Conditions with their messages as tooltips, external metric names, original replica
   count, last active time and the pause state.
 
@@ -152,9 +153,10 @@ src/
   main/index.ts                                  # main entry (stateless)
   renderer/index.tsx                             # registrations: page, details, menu, customResources
   renderer/api/types.ts                          # KEDA spec/status types
+  renderer/api/events.ts                         # last seen time and order of the events, for both event APIs
   renderer/api/scaledobject/scaledobject-v1.ts   # ScaledObject model (+ Api, test)
   renderer/pages/                                # Scaled Objects page + CSS module
-  renderer/details/                              # ScaledObject details panel (incl. Scaling Events)
+  renderer/details/                              # ScaledObject details panel, Scaling Events
   renderer/menus/                                # Pause/Scale to Zero/Resume Autoscaling (ScaledObject)
   renderer/icons/                                # KEDA logo (currentColor)
   renderer/components/                           # createAvailableVersionPage, error boundaries
