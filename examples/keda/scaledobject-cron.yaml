@@ -17,4 +17,4 @@ spec:
       timezone: America/Sao_Paulo
       start: 30 0 * * *
       end: 45 0 * * *
-      desired: "1"
+      desiredReplicas: "1"
