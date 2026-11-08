@@ -306,6 +306,8 @@ from the Custom Resources tree.
 - The details panel lists the object's core Events (the scaling decisions the
   controller records) from the host's event store, newest first; the section
   is left out while the host serves no event store.
+- `Renderer.Component.ConfirmDialog` lays its content out as flex items, so its
+  `message` is one element, `<p>...</p>` ("Rules That Fail Silently").
 - The host renders a cluster page with `params` only. A page that needs the
   extension gets it from the registration
   (`Page: () => <ScaledObjectsPageAvailable extension={this} />`), with the
@@ -386,6 +388,10 @@ or not visibly at all.
   admits `string | undefined` only, and `undefined` drops the key from the
   JSON, so the annotation stays. The menu items cast the annotations once, in
   one place; keep the cast there.
+- **A `ConfirmDialog` message is one element.** The dialog lays out its icon
+  and its message as flex items, so text beside an inline element such as
+  `<b>` becomes flex items of its own, which lose the spaces at their edges.
+  Wrap the message in a `<p>`; the menu item test checks it.
 - **Every page, details panel and menu item inside an error boundary**
   ("Renderer Components").
 - **A cluster page gets the extension from its registration.** The host passes

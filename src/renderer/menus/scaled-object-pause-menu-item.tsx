@@ -55,11 +55,13 @@ export const ScaledObjectPauseMenuItem = ({ object, toolbar }: ScaledObjectPause
       <MenuItem
         onClick={() =>
           ConfirmDialog.open({
+            // One element: the dialog lays its content out as flex items, and the text around the target name would
+            // otherwise be items of their own, which lose the spaces at their edges.
             message: (
-              <>
+              <p>
                 Scale <b>{ScaledObject.getScaleTarget(object)}</b> to zero replicas and keep it there until autoscaling
                 is resumed?
-              </>
+              </p>
             ),
             labelOk: "Scale to Zero",
             ok: () => annotate({ [ScaledObject.pausedReplicasAnnotation]: "0" }),

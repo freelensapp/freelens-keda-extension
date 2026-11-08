@@ -80,6 +80,22 @@ describe("ScaledObjectPauseMenuItem", () => {
 
       expect(patchedAnnotations(patch)).toEqual({ [PAUSED_REPLICAS]: "0" });
     });
+
+    // The dialog lays its content out as flex items: text beside the target name would be items of its own and lose
+    // the spaces at its edges, so the question is one paragraph.
+    it("asks to scale the target to zero in one paragraph", () => {
+      const open = vi.spyOn(Renderer.Component.ConfirmDialog, "open");
+      render(<ScaledObjectPauseMenuItem object={buildScaledObject()} />);
+
+      fireEvent.click(screen.getByText("Scale to Zero"));
+      const { container } = render(<>{open.mock.calls[0][0].message}</>);
+
+      expect(container.children).toHaveLength(1);
+      expect(container.firstElementChild?.tagName).toBe("P");
+      expect(container.textContent).toBe(
+        "Scale Deployment/example-app to zero replicas and keep it there until autoscaling is resumed?",
+      );
+    });
   });
 
   describe("for a paused object", () => {
