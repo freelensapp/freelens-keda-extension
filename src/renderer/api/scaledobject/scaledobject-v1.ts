@@ -9,11 +9,14 @@ export type { ScaledObjectSpec, ScaledObjectStatus };
  * operator scales the referenced workload, and which scalers (triggers)
  * produce the metric values.
  */
-export class ScaledObject extends Renderer.K8sApi.KubeObject<
+export class ScaledObject extends Renderer.K8sApi.LensExtensionKubeObject<
   Renderer.K8sApi.KubeObjectMetadata,
   ScaledObjectStatus,
   ScaledObjectSpec
 > {
+  declare kind: "ScaledObject";
+  declare apiVersion: "keda.sh/v1alpha1";
+
   static readonly kind = "ScaledObject";
   static readonly namespaced = true;
   static readonly apiBase = "/apis/keda.sh/v1alpha1/scaledobjects";
@@ -98,13 +101,26 @@ export class ScaledObject extends Renderer.K8sApi.KubeObject<
   }
 
   /**
-   * The SCALETARGET column of `kubectl get so`: `kind/name`, preferring the
-   * kind the controller resolved in the status over the one in the spec, and
-   * defaulting to a Deployment.
+   * The kind of the scale target. The controller resolves it into the status
+   * as a GVK string, `<group>/<version>.<kind>` (`apps/v1.Deployment`), so the
+   * kind is what follows the last dot. Until the controller has resolved it,
+   * and for an object it rejects, such as a second ScaledObject on the same
+   * workload, it is the kind of the spec, or Deployment, the controller's
+   * default.
+   */
+  static getScaleTargetKind(object: ScaledObject): string {
+    const resolved = object.status?.scaleTargetKind;
+    if (resolved) return resolved.slice(resolved.lastIndexOf(".") + 1);
+    return object.spec.scaleTargetRef.kind ?? "Deployment";
+  }
+
+  /**
+   * The SCALETARGETKIND and SCALETARGETNAME columns of `kubectl get so` as one
+   * `kind/name`, with the kind alone, so that the target reads the same
+   * before and after the controller has resolved it.
    */
   static getScaleTarget(object: ScaledObject): string {
-    const kind = object.status?.scaleTargetKind ?? object.spec.scaleTargetRef.kind ?? "Deployment";
-    return `${kind}/${object.spec.scaleTargetRef.name}`;
+    return `${ScaledObject.getScaleTargetKind(object)}/${object.spec.scaleTargetRef.name}`;
   }
 
   static getScaleTargetName(object: ScaledObject): string {
@@ -187,19 +203,7 @@ export class ScaledObject extends Renderer.K8sApi.KubeObject<
   }
 }
 
+// The host registers an API and a store for every version of a CRD the cluster
+// serves, and `ScaledObject.getStore()` resolves them, so the extension builds
+// neither. The class names the type of that API for the list layout.
 export class ScaledObjectApi extends Renderer.K8sApi.KubeApi<ScaledObject> {}
-
-// `autoRegister: false` keeps the API out of the cluster's apiManager: the
-// "Not Available" page of `createAvailableVersionPage` relies on the apiBase
-// being found only when the cluster actually serves the CRD. The store below
-// is registered in the extension's `onActivate` instead.
-export const scaledObjectApi = new ScaledObjectApi({
-  objectConstructor: ScaledObject,
-  autoRegister: false,
-});
-
-export class ScaledObjectStore extends Renderer.K8sApi.KubeObjectStore<ScaledObject> {
-  readonly api = scaledObjectApi;
-}
-
-export const scaledObjectStore = new ScaledObjectStore();

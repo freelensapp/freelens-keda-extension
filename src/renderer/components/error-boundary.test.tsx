@@ -3,7 +3,7 @@
 import { Common, type Renderer } from "@freelensapp/extensions";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScaledObject, scaledObjectStore } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
 import { ScaledObjectsPage } from "../pages/scaled-objects-page";
 import {
   ErrorBoundary,
@@ -26,12 +26,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const Throws = ({ message = "boom" }: { message?: string }): JSX.Element => {
+const Throws = ({ message = "boom" }: { message?: string }): React.JSX.Element => {
   throw new Error(message);
 };
 
 // A child that throws only for some objects, as a details panel does for an object without a field it reads.
-const ThrowsFor = ({ object }: Renderer.Component.KubeObjectDetailsProps<any>) => {
+const ThrowsFor = ({ object }: { object: { broken: boolean } }) => {
   if (object.broken) throw new Error("broken object");
   return <p>fine object</p>;
 };
@@ -133,9 +133,9 @@ describe("the registration wrappers", () => {
       metadata: { name: "example-app", namespace: "default", uid: "1", resourceVersion: "1", selfLink: "" },
       spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu" }] },
     });
-    // The page reads its items from the exported store, which the stub keeps
-    // as a plain array.
-    scaledObjectStore.items.push(object);
+    vi.spyOn(ScaledObject, "getStore").mockReturnValue({
+      items: [object],
+    } as unknown as Renderer.K8sApi.KubeObjectStore<ScaledObject, Renderer.K8sApi.KubeApi<ScaledObject>>);
     vi.spyOn(ScaledObject, "getStatusText").mockImplementation(() => {
       throw new Error("no status field");
     });

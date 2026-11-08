@@ -1,5 +1,5 @@
 import { Common, Renderer } from "@freelensapp/extensions";
-import { ScaledObject, scaledObjectStore } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "../api/scaledobject/scaledobject-v1";
 
 const {
   Component: { ConfirmDialog, Icon, MenuItem },
@@ -27,7 +27,7 @@ export const ScaledObjectPauseMenuItem = ({ object, toolbar }: ScaledObjectPause
   // for resuming; the host's patch type (string | undefined) does not admit
   // null, hence the cast.
   const annotate = (annotations: Record<string, string | null>) =>
-    scaledObjectStore.patch(
+    ScaledObject.getStore<ScaledObject>().patch(
       object,
       { metadata: { annotations: annotations as unknown as Record<string, string | undefined> } },
       "merge",
@@ -55,11 +55,13 @@ export const ScaledObjectPauseMenuItem = ({ object, toolbar }: ScaledObjectPause
       <MenuItem
         onClick={() =>
           ConfirmDialog.open({
+            // One element: the dialog lays its content out as flex items, and the text around the target name would
+            // otherwise be items of their own, which lose the spaces at their edges.
             message: (
-              <>
+              <p>
                 Scale <b>{ScaledObject.getScaleTarget(object)}</b> to zero replicas and keep it there until autoscaling
                 is resumed?
-              </>
+              </p>
             ),
             labelOk: "Scale to Zero",
             ok: () => annotate({ [ScaledObject.pausedReplicasAnnotation]: "0" }),

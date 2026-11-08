@@ -1,8 +1,7 @@
 import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
-import { ScaledObject, type ScaledObjectApi, scaledObjectStore } from "../api/scaledobject/scaledobject-v1";
+import { ScaledObject, type ScaledObjectApi } from "../api/scaledobject/scaledobject-v1";
 import styles from "./scaled-objects-page.module.scss";
-import stylesInline from "./scaled-objects-page.module.scss?inline";
 
 const { observer } = MobxReact;
 
@@ -44,33 +43,30 @@ const renderTableHeader: { title: string; sortBy: keyof typeof sortingCallbacks;
 
 // The columns mirror `kubectl get so`: SCALETARGET, MIN, MAX, TRIGGERS, STATUS, READY, ACTIVE, FALLBACK.
 export const ScaledObjectsPage = observer(() => {
-  const store = scaledObjectStore;
+  const store = KubeObject.getStore<KubeObject>();
 
   return (
-    <>
-      <style>{stylesInline}</style>
-      <KubeObjectListLayout<KubeObject, KubeObjectApi>
-        tableId={`${KubeObject.crd.plural}Table`}
-        className={styles.page}
-        store={store}
-        sortingCallbacks={sortingCallbacks}
-        searchFilters={[(object: KubeObject) => object.getSearchFields()]}
-        renderHeaderTitle={KubeObject.crd.title}
-        renderTableHeader={renderTableHeader}
-        renderTableContents={(object: KubeObject) => [
-          <WithTooltip>{object.getName()}</WithTooltip>,
-          <LinkToNamespace namespace={object.getNs()} />,
-          <WithTooltip>{KubeObject.getScaleTarget(object)}</WithTooltip>,
-          KubeObject.getMin(object) ?? "-",
-          KubeObject.getMax(object) ?? "-",
-          <WithTooltip>{KubeObject.getTriggerSummary(object)}</WithTooltip>,
-          <Badge label={KubeObject.getStatusText(object)} className={KubeObject.getStatusClass(object)} />,
-          <BadgeBoolean value={KubeObject.getReady(object)} />,
-          <BadgeBoolean value={KubeObject.getActive(object)} />,
-          <BadgeBoolean value={KubeObject.getFallback(object)} />,
-          <KubeObjectAge object={object} key="age" />,
-        ]}
-      />
-    </>
+    <KubeObjectListLayout<KubeObject, KubeObjectApi>
+      tableId={`${KubeObject.crd.plural}Table`}
+      className={styles.page}
+      store={store}
+      sortingCallbacks={sortingCallbacks}
+      searchFilters={[(object: KubeObject) => object.getSearchFields()]}
+      renderHeaderTitle={KubeObject.crd.title}
+      renderTableHeader={renderTableHeader}
+      renderTableContents={(object: KubeObject) => [
+        <WithTooltip>{object.getName()}</WithTooltip>,
+        <LinkToNamespace namespace={object.getNs()} />,
+        <WithTooltip>{KubeObject.getScaleTarget(object)}</WithTooltip>,
+        KubeObject.getMin(object) ?? "-",
+        KubeObject.getMax(object) ?? "-",
+        <WithTooltip>{KubeObject.getTriggerSummary(object)}</WithTooltip>,
+        <Badge label={KubeObject.getStatusText(object)} className={KubeObject.getStatusClass(object)} />,
+        <BadgeBoolean value={KubeObject.getReady(object)} />,
+        <BadgeBoolean value={KubeObject.getActive(object)} />,
+        <BadgeBoolean value={KubeObject.getFallback(object)} />,
+        <KubeObjectAge object={object} key="age" />,
+      ]}
+    />
   );
 });

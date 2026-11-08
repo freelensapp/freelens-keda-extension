@@ -4,7 +4,7 @@
  */
 
 import { Renderer } from "@freelensapp/extensions";
-import { ScaledObject, scaledObjectStore } from "./api/scaledobject/scaledobject-v1";
+import { ScaledObject } from "./api/scaledobject/scaledobject-v1";
 import { createAvailableVersionPage } from "./components/available-version";
 import {
   withDetailsErrorBoundary,
@@ -13,7 +13,7 @@ import {
 } from "./components/error-boundary";
 import { ScaledObjectDetails } from "./details/scaled-object-details";
 import { KedaIcon } from "./icons";
-import { ScaledObjectPauseMenuItem, type ScaledObjectPauseMenuItemProps } from "./menus/scaled-object-pause-menu-item";
+import { ScaledObjectPauseMenuItem } from "./menus/scaled-object-pause-menu-item";
 import { ScaledObjectsPage } from "./pages/scaled-objects-page";
 
 // The kind serves a single API version, keda.sh/v1alpha1. The page still goes through
@@ -28,14 +28,6 @@ const ScaledObjectsPageAvailable = createAvailableVersionPage("Scaled Objects", 
 // replace the whole cluster view. Each registration field is mapped through its wrapper, so an entry added to it is
 // wrapped too.
 export default class KedaRenderer extends Renderer.LensExtension {
-  onActivate() {
-    // The v1 API registers the extension's stores with the cluster's
-    // apiManager; `apiManager.getStore(apiBase)` resolves them when the
-    // cluster serves the CRD, which is also what shows the page's "Not
-    // Available" state before that.
-    Renderer.K8sApi.apiManager.registerStore(scaledObjectStore);
-  }
-
   clusterPages: Renderer.LensExtension["clusterPages"] = [
     {
       id: "scaled-objects",
@@ -45,10 +37,10 @@ export default class KedaRenderer extends Renderer.LensExtension {
     },
   ].map((registration) => withPageErrorBoundary(this, registration));
 
-  clusterPageMenus = [
+  clusterPageMenus: Renderer.LensExtension["clusterPageMenus"] = [
     {
       id: "scaled-objects",
-      title: "Scaled Objects",
+      title: ScaledObject.crd.title,
       target: { pageId: "scaled-objects" },
       components: {
         Icon: KedaIcon,
@@ -56,24 +48,17 @@ export default class KedaRenderer extends Renderer.LensExtension {
     },
   ];
 
+  // The kind has a page of its own, so the host leaves it out of the Custom Resources tree of the cluster sidebar,
+  // where it would otherwise be listed a second time under keda.sh.
+  customResources = [ScaledObject];
+
+  // The helpers take `kind` and `apiVersions` from the model class and type the props of the panel and the item from
+  // it, so a panel or an item written for another kind fails the type check.
   kubeObjectDetailItems: Renderer.LensExtension["kubeObjectDetailItems"] = [
-    {
-      kind: ScaledObject.kind,
-      apiVersions: ScaledObject.crd.apiVersions,
-      priority: 10,
-      components: {
-        Details: (props: Renderer.Component.KubeObjectDetailsProps<ScaledObject>) => <ScaledObjectDetails {...props} />,
-      },
-    },
+    Renderer.K8sApi.detailsFor(ScaledObject, { priority: 10, Details: ScaledObjectDetails }),
   ].map((registration) => withDetailsErrorBoundary(this, registration));
 
   kubeObjectMenuItems: Renderer.LensExtension["kubeObjectMenuItems"] = [
-    {
-      kind: ScaledObject.kind,
-      apiVersions: ScaledObject.crd.apiVersions,
-      components: {
-        MenuItem: (props: ScaledObjectPauseMenuItemProps) => <ScaledObjectPauseMenuItem {...props} />,
-      },
-    },
+    Renderer.K8sApi.menuItemFor(ScaledObject, { MenuItem: ScaledObjectPauseMenuItem }),
   ].map((registration) => withMenuItemErrorBoundary(this, registration));
 }
