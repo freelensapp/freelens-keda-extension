@@ -35,10 +35,9 @@ release of `@freelensapp/extensions`. `@freelensapp/extensions` is pinned to
 one exact version. The libraries the host provides at runtime (`react`,
 `react-dom`, `mobx`, `mobx-react`) and their types are devDependencies only,
 for compiling and testing; the build maps the imports onto the host's copies
-("Build"). `electron` is a devDependency for its types only, with its install
-script off in `pnpm-workspace.yaml`, so the Electron binary is never
-downloaded. Freelens installs no dependency of an extension: whatever the code
-needs at runtime and the host does not provide has to be in the bundle.
+("Build"). `electron` is a devDependency for its types only. Freelens installs
+no dependency of an extension: whatever the code needs at runtime and the host
+does not provide has to be in the bundle.
 
 pnpm settings live in `pnpm-workspace.yaml`: `allowBuilds` for the
 dependencies with install scripts (a new one must be listed there with `true`
@@ -56,6 +55,7 @@ pnpm type:check                # All of the programs below, in this order
 pnpm type:check:sources        # main and renderer, each with src/common/
 pnpm type:check:tests          # Tests and test support
 pnpm type:check:tooling        # Vite and Vitest configs, build plugins
+pnpm type:check:integration    # Integration tests
 pnpm type:check:environments   # Environment tests
 
 # Linting & formatting
@@ -69,6 +69,7 @@ pnpm knip:check           # Unused files, unused and unlisted dependencies (knip
 
 # Tests
 pnpm test:unit            # vitest
+pnpm test:integration     # vitest, against Freelens dev with a kind cluster
 
 # Build
 pnpm build                # Both Vite runs, without the type check
@@ -104,6 +105,8 @@ src/
 test/freelens-extensions.ts          # Runtime stub of @freelensapp/extensions for Vitest
 environment-tests/                   # Probes for the per-environment programs
 build/                               # Vite plugins: host modules, standard decorators, CSS module declarations
+integration/__tests__/               # Integration tests, run against Freelens dev over CDP, and their shared module
+integration/fixtures/                # Test objects of the integration tests, one of each kind
 vite.config.mjs                      # The build, renderer and main
 examples/keda/                       # Test objects of the four kinds, and the Deployments they scale (kubectl apply -f)
 ```
@@ -281,11 +284,15 @@ memory:
 8. **A test object** in `examples/keda/`, and its row in `README.md`. KEDA
    accepts one ScaledObject per workload, so each test object scales a workload
    of its own.
+9. **The integration tests**: the kind's entry in `kindViews` of
+   `integration/__tests__/keda.tests.ts`, its plural in `crdPlurals` of
+   `extension-helpers.ts`, and a test object named `test` in
+   `integration/fixtures/` ("Workflows").
 
 Then check the result in Freelens with the checkout installed from its
-directory (`README.md`, "Development loop"): the page lists the test object,
-the details show every field, the menu items work, and the resource is gone
-from the Custom Resources tree.
+directory ("Checking the Extension in Freelens Dev"): the page lists the test
+object, the details show every field, the menu items work, and the resource is
+gone from the Custom Resources tree.
 
 ## Renderer Components
 
@@ -395,8 +402,7 @@ from the Custom Resources tree.
   `Renderer.Component.Icon` through its `svg` prop, on the 24x24 grid of the
   other sidebar icons with a margin of 2: the KEDA icon is the heptagon and the
   lightning bolt of the KEDA logo, whose lettering does not survive 20 pixels.
-  An icon is made of filled shapes only ("Rules That Fail Silently"). Biome
-  leaves `.svg` files alone (`biome.jsonc`), so the icon stays as authored.
+  An icon is made of filled shapes only ("Rules That Fail Silently").
 
 ## Rules That Fail Silently
 
@@ -649,67 +655,381 @@ Tests import what they use from `vitest`
 the globals. `globals: true` stays on at runtime only, because React Testing
 Library registers its automatic cleanup only when `afterEach` is a global.
 
+The integration tests are apart: `vitest.integration.config.ts` runs the
+`*.tests.ts` files in `integration/__tests__/` against Freelens dev, and
+`integration/tsconfig.json` type-checks them ("Workflows").
+
 ## Lint and CI
 
 ### Biome
 
-`biome.jsonc` has the formatter, import groups and rules of Freelens. Biome
-formats SCSS, YAML and Markdown too, as in Freelens, so Trunk runs no Prettier
-or markdownlint; yamllint still checks YAML. Two overrides are specific to the
-extension: `style/noRestrictedImports` keeps `vitest` and the testing helpers
-of React out of the extension's code, and `correctness/noNodejsModules`
-rejects a Node builtin import in `src/renderer/` and `src/common/`, tests left
-out. Every path in an override starts with `**/`: Trunk runs Biome from a
-sandbox outside the repository, where a path anchored at the repository root
-matches no file. The Biome commands in `.trunk/trunk.yaml` pass
-`--vcs-use-ignore-file=false` for the same reason, and no `--config-path`,
-which would turn the parser options off.
+`biome.jsonc` has the formatter, import groups and rules of Freelens. Two
+overrides are specific to how the extension is laid out:
 
-`biome.jsonc` leaves out `.svg` files, the Kubernetes manifests in `examples/`,
-whose sequences stay unindented as kubectl writes them and which yamlfmt
-formats with `examples/.yamlfmt.yaml`, and `pnpm-lock.yaml`,
-`pnpm-workspace.yaml` and `.trunk/`, which pnpm and Trunk write.
+- `style/noRestrictedImports` keeps `vitest` and the testing helpers of React
+  out of the extension's code (see "Tests").
+- `correctness/noNodejsModules` rejects a Node builtin import in
+  `src/renderer/` and `src/common/`, tests left out. It flags the import in the
+  editor, before `pnpm type:check` does; it does not see Node globals such as
+  `Buffer` or `process`, which only the type check catches.
 
-Renovate updates Biome, and `biome-migrate.yaml` runs `biome migrate` on the
-Renovate branch so that the bump and its migration are one pull request.
+Every path in an override starts with `**/`. Trunk runs Biome on a copy of the
+files in a sandbox outside the repository, and there a path anchored at the
+repository root matches no file, so the override silently does nothing. A
+plain `biome check` matches both forms, so only `trunk check` shows the
+difference.
+
+The Biome commands in `.trunk/trunk.yaml` let Biome find the copy of
+`biome.jsonc` in the sandbox rather than pass `--config-path`. Biome 2.6.4
+ignores every parser option when the config is given explicitly, with
+`--config-path` or `BIOME_CONFIG_PATH`.
+
+In that sandbox, Biome also cannot apply `vcs.useIgnoreFile`: since 2.5.15 it
+matches every target against the repository's `.gitignore` and panics on a
+path outside the repository root, so every file fails. The Biome commands in
+`.trunk/trunk.yaml` pass `--vcs-use-ignore-file=false`, because Trunk applies
+`.gitignore` itself before it picks the targets; `biome.jsonc` keeps the
+setting on for `pnpm biome` and editors.
+
+Renovate updates Biome, in the `biome` script and in `.trunk/trunk.yaml`, but
+cannot run `biome migrate`. `biome-migrate.yaml` runs it on the Renovate
+branch, then `biome format --write` with the migrated config, and commits the
+migrated `biome.jsonc` and the reformatted files there, so that the update, its
+migration and the formatting the new version changes are one pull request.
+`--update` stages only tracked files, which are all the formatter touches. The
+commit is by `github-actions[bot]`, which
+`gitIgnoredAuthors` in `.renovaterc.json` lists, so that Renovate does not take
+it for a manual edit and stop updating the branch.
+
+Biome formats SCSS, YAML, Markdown and the SVG icon too, as in Freelens, so
+Trunk runs no Prettier or markdownlint; yamllint still checks YAML. The
+Kubernetes manifests in `examples/` and `integration/fixtures/` are the
+exception: their sequences stay unindented, as kubectl writes them, which Biome
+cannot do, so yamlfmt formats them with the `.yamlfmt.yaml` of each directory,
+and the ignore rules of `.trunk/trunk.yaml` give them to yamlfmt only.
+`biome.jsonc` leaves them out, together with `pnpm-lock.yaml` and
+`pnpm-workspace.yaml`, which pnpm writes, and `.trunk/`, whose `trunk.yaml`
+`trunk upgrade` rewrites.
+
+The Markdown rules are in `nursery`.
 
 ### Knip
 
-`pnpm knip:check` runs knip twice: a development pass over everything, and a
-`--production --strict` pass from the entries marked with `!` in `knip.jsonc`,
-`src/main/index.ts` and `src/renderer/index.tsx`. A file no entry reaches is
-unused; remove it rather than ignore it. The host-provided modules are in
-`ignoreDependencies`: they are devDependencies for their types, which the
-production pass would report as unlisted. The Vite plugin is off and
-`vite.config.mjs` is an entry instead, `svgo` is on for `svgo.config.mjs`,
-the probes in `environment-tests/` are entries, `dist/**` is ignored so that a
-built bundle is not analysed, and `project` leaves out the CSS module
-declarations, which knip would otherwise report as unused.
+`pnpm knip:check` runs knip twice, for unused files and for dependencies: a
+development pass over everything, and a `--production --strict` pass over the
+code that reaches the bundles, which are the entries marked with `!` in
+`knip.jsonc`. In the production pass only `dependencies` count, so a bundled
+library that the extension's code imports belongs there. The host-provided
+modules are devDependencies, for their types, and are ignored.
+
+A file is unused when no entry reaches it: a leftover module, a barrel that
+nothing imports. The production pass starts from the `!` entries only, so it
+also reports a module that only tests import. The fix is to remove the file,
+not to ignore it. The check does not include unused exports and types: on this
+tree they are mostly the exported spec and status types of the models.
+
+`knip.jsonc` lists the entries knip cannot find: the two source entries, the
+Vitest alias target `test/freelens-extensions.ts`, the integration tests and
+the probes in `environment-tests/`. Its Vite plugin is off: it adds the
+renderer entry of `vite.config.mjs` as a development entry, which displaces
+`src/renderer/index.tsx!`, and the production pass then skips the renderer.
+`--no-config-hints` is set because one config serves both passes, and an entry
+that only the production pass needs is reported as redundant by the other.
+`kubectl`, which the integration tests call, comes from the system, or from
+helm/kind-action in CI, and `yq` from mise, so both are in `ignoreBinaries`.
+
+Two more settings keep the file check to real findings. `project` leaves out
+the CSS module declarations with `!src/**/*.d.scss.ts`: TypeScript reaches them
+through `allowArbitraryExtensions`, while knip resolves
+`import styles from "./x.module.scss"` to the stylesheet, so nothing would
+import them. The negation has no trailing `!`, which would apply it to the
+production pass only. And the SVGO plugin is on (`"svgo": true`), so that
+`svgo.config.mjs` is an entry: Trunk runs SVGO, and no dependency turns the
+plugin on.
+
+`ignore` leaves out `dist/**`. The `main` field of `package.json` makes
+`dist/main.js` an entry once it exists, and the `knip` script runs with
+`--no-gitignore`, so after `pnpm build`, which `check.yaml` runs first, knip
+would analyse the bundle and report what it inlines from the libraries it
+bundles. Run `pnpm knip:check` after a build when changing `knip.jsonc`, as
+`check.yaml` does; without `dist/` the problem does not show.
 
 ### Workflows
 
-| Workflow                                                  | Runs                                                                                                                                  |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `type-check.yaml`                                         | `pnpm type:check`                                                                                                                     |
-| `check.yaml`                                              | `pnpm build`, `pnpm lint:check`, `pnpm knip:check`                                                                                    |
-| `unit-tests.yaml`                                         | `pnpm test:unit`                                                                                                                      |
-| `trunk-check.yaml`                                        | `trunk check --all`                                                                                                                   |
-| `mise-lock-check.yaml`                                    | on a change to `mise.lock`: no checksum changed for an unchanged tool version                                                         |
-| `biome-migrate.yaml`                                      | `biome migrate` on a Renovate branch                                                                                                  |
-| `npm-audit.yaml`, `npm-dedupe.yaml`, `trunk-upgrade.yaml` | scheduled maintenance, each in an `automated/*` pull request; `/rerun` by a collaborator reruns one                                   |
-| `npm-version.yaml`, `tag.yaml`, `release.yaml`            | the version bump pull request, the tag when it merges (or `/tag` by a collaborator), the npm publish and GitHub release of a `v*` tag |
-| `claude.yaml`, `claude-task.yaml`                         | Claude Code on `@claude` and on dispatch ("GitHub Actions (Claude Code Action) Rules")                                                |
+| Workflow                                       | Runs                                                                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `type-check.yaml`                              | `pnpm type:check`                                                                                                                     |
+| `check.yaml`                                   | `pnpm build`, `pnpm lint:check`, `pnpm knip:check`                                                                                    |
+| `unit-tests.yaml`                              | `pnpm test:unit`                                                                                                                      |
+| `trunk-check.yaml`                             | `trunk check --all`                                                                                                                   |
+| `integration-tests.yaml`                       | the integration tests in `integration/`, against Freelens dev                                                                         |
+| `mise-lock-check.yaml`                         | on a change to `mise.lock`: no checksum changed for an unchanged tool version                                                         |
+| `cleanup-cache.yaml`                           | on a closed pull request: deletes the caches of its merge ref                                                                         |
+| `biome-migrate.yaml`                           | `biome migrate` on a Renovate branch                                                                                                  |
+| `npm-dedupe.yaml`, `trunk-upgrade.yaml`        | scheduled maintenance, each in an `automated/*` pull request; `/rerun` by a collaborator reruns one                                   |
+| `npm-version.yaml`, `tag.yaml`, `release.yaml` | the version bump pull request, the tag when it merges (or `/tag` by a collaborator), the npm publish and GitHub release of a `v*` tag |
+| `claude.yaml`, `claude-task.yaml`              | Claude Code on `@claude` and on dispatch ("GitHub Actions (Claude Code Action) Rules")                                                |
 
-The type check has a workflow of its own, which runs every program, tests,
-tooling and environment tests included, and `check.yaml` builds without the
-type check, so it does not run twice. The integration tests of the template,
-which drive Freelens dev over CDP, are not part of this repository yet.
+The workflows are those of freelensapp/freelens-example-extension, byte for
+byte; a change to one of them starts there.
+
+The type check has a workflow of its own, on pull requests and on pushes to
+`main`, as in Freelens. It runs every program, tests, tooling and environment
+tests included, which no build reaches, and a type error shows as its own
+failed check rather than as a failed build. `check.yaml` builds without the
+type check for the same reason, so it does not run twice.
+
+The integration tests follow the pattern of the template. They run under their
+own Vitest (`vitest.integration.config.ts`, `pnpm test:integration`), against
+Freelens started with `pnpm dev` from a freelensapp/freelens checkout. They
+attach to it with Playwright's `chromium.connectOverCDP` on the port that
+script opens (see "Checking the Extension in Freelens Dev"), so they need no
+package of Freelens and no file of its checkout; Freelens dev is the only
+dependency, and it is not in `package.json`. `playwright` is a devDependency at
+the version of Freelens's catalog. The workflow builds the extension, checks
+out Freelens at each release tag of its matrix (`v2.0.0`), starts `pnpm dev`
+there in the background under `xvfb-run`, with its output in a file and a
+fresh profile in `FREELENS_INTEGRATION_TESTING_DIR`, waits until the CDP
+endpoint answers, and runs `pnpm test:integration` here. The job
+`integration tests` waits for every job of the matrix and fails when one of
+them did not succeed; the branch rules require it rather than the jobs of the
+matrix, whose names change with the matrix. A profile of Freelens dev syncs no
+kubeconfig by default, so the workflow seeds the fresh one with a single sync
+entry, a file with the kind cluster alone, and the catalog lists that cluster
+and nothing else. Every test file is a session of its own on the one app, and
+fails on any error logged by either process:
+
+- `extensions.tests.ts` uninstalls whatever installation of the extension the
+  app has and installs this checkout in place from the Extensions page. The
+  extension has no preferences to open. It needs no cluster.
+- `keda.tests.ts` opens the kind cluster with the CRDs of the four kinds and a
+  test object of each, and clicks through the extension's views: each list
+  page shows a row for its object; its details show the extension's panel, in
+  `keda.sh/v1alpha1`, with no error page of the error boundary; and each row
+  menu lists the extension's items that apply to an object that is not paused,
+  Pause Autoscaling and Scale to Zero for the ScaledObject, Pause Autoscaling
+  for the ScaledJob, none for the two authentication kinds. Then it writes:
+  Scale to Zero, once its confirmation is accepted, sets
+  `autoscaling.keda.sh/paused-replicas` to `0` on the ScaledObject, and Pause
+  Autoscaling sets `autoscaling.keda.sh/paused` to `true` on the ScaledJob,
+  both read back with kubectl. Last, the trigger of the ScaledObject links to
+  the details of its TriggerAuthentication. Each view opens its page itself;
+  the two writes come after the menu checks, which expect the objects not
+  paused. They do not check the columns, every field, Resume Autoscaling or the
+  Custom Resources tree. They keep an in-place installation of this checkout
+  that is enabled, and install it otherwise.
+
+The tests are deterministic, so nothing retries them: the config sets no
+`retry`, and the workflow runs the step once, under `timeout 600`. A retry
+repeats the same failure, and every view of a session waits its full timeout
+before it fails. The one exception is the cluster frame, which `openKindCluster`
+loads a second time when it did not render and the dev file route of Freelens
+failed a request meanwhile (see below); that failure is of Freelens dev, not of
+a test.
+
+The sessions reach the app through its renderer only; the main process, and
+with it the application menu, is out of reach of CDP. They navigate the root
+frame with `Renderer.Navigation.navigate` of the extension API, find the kind
+cluster with `Renderer.Catalog.catalogEntities` by its name, `kind-<name>`,
+and connect it by navigating to `/cluster/<id>` and disconnect it with the
+entity's `disconnect()`. The pages of the extension are nested under the KEDA
+group of the sidebar, which renders collapsed, so the cluster frame is
+navigated with `Renderer.Navigation.navigate` too. `browser.close()` of a
+browser connected over CDP closes only the connection, so a session ends with
+it and the app keeps running. The renderer's console carries the errors of the
+root frame and of every cluster frame; the main log is read from the file that
+`FREELENS_MAIN_LOG` names, from its size when the session started, and every
+line that starts with `error:` counts, also after a task prefix that turbo may
+add, such as `freelens:dev:`, except
+`proxy_server.go:… Error while proxying request: context canceled`, which the
+Kubernetes proxy of Freelens logs for a request that the renderer aborts.
+Freelens dev renders in `React.StrictMode`, which mounts every view twice and
+aborts the requests of the first mount, so the line comes and goes with the
+timing of a run; it names no request and says nothing about the extension.
+Without the variable only the renderer is checked. A renderer error carries its
+location, line and column included, and the worker that logged it. Its text is
+the preview of its arguments, which is empty for some objects and only the
+class name for others, such as `ErrorEvent`; such an error is described from
+its arguments, read from the page, and an empty one without arguments, which
+the browser itself logs, gets its time, to find it in the main log. An uncaught
+value that is not an `Error` reaches the session as a page error with an empty
+stack, and is described by its name and message, with its time.
+
+The dev file route of Freelens dev, which serves the renderer's modules from
+the Vite dev server, logs a request that fails as a warning
+(`[DEV-FILE-ROUTE]: request for … failed`): its keep-alive agent at times
+reuses a socket that the dev server is closing, and the request fails with
+`ECONNRESET`. The route answers such a request with a 502, and Chromium logs
+`Failed to load resource: the server responded with a status of 502`; that
+error is left out when the main log has the failed request for its URL. When
+the module belongs to Monaco's editor worker, which a YAML view starts, the
+worker does not load, and Monaco rethrows its `error` event, an `Event` with
+no name, which is left out when the main log has a failed request. When the
+module belongs to the cluster frame, such as one of Freelens's own
+stylesheets, the frame does not render its sidebar, and `openKindCluster`,
+after its timeout, loads the frame again once, only if the main log has a
+failed request since the cluster was opened.
+
+The workflow sets `TURBO_LOG_ORDER=stream` for `pnpm dev`: in GitHub Actions
+turbo otherwise groups the output of a task until it ends, and the persistent
+`dev` task never ends, so the log would stay empty.
+
+The cluster session applies the CRDs of one KEDA release, `TEST_KEDA_VERSION`
+or `v2.21.0`, the release the types follow ("Types"), from the sources of the
+release (`config/crd/bases/` of kedacore/keda at its tag). It applies them
+server-side, because the CRDs of ScaledObject and ScaledJob are larger than the
+annotation of a client-side apply, and runs no controller: the views read the
+API, and the test objects need no reconciliation, so they have no status.
+Vitest runs the files one at a time (`fileParallelism: false`), in no set
+order, and none depends on another having run: the session disconnects the
+kind cluster, removes the leftovers of an earlier run (the namespace
+`integration-tests` and the CRDs), applies the CRDs, waits until they are
+established, creates the namespace `integration-tests`, applies
+`integration/fixtures/cluster-objects.yaml` and, in that namespace,
+`integration/fixtures/objects.yaml`, and only then connects the cluster. The
+session then selects `integration-tests` in the namespace filter of the
+extension's Scaled Objects page, which its `KubeObjectListLayout` renders for a
+namespaced resource, unless the filter already shows it: a new cluster shows
+only `default`, and the app keeps the selection for every namespaced list of
+the cluster. Without it the namespaced pages list nothing, and their views fail
+on their timeout. The session opens no page of the host, whose requests can log
+errors of their own: the Pods page asks for pod metrics, and kind has no
+metrics server. The session's teardown stops collecting the errors first, then
+disconnects the cluster, so that the app logs no watch error for a CRD deleted
+under it, then deletes the namespace and the CRDs with `--wait`, also when a
+test failed, and then checks the errors. The app refreshes the cluster's
+permissions while it disconnects it, and when the refresh loses the race, its
+requests fail on its own proxy (`[AUTHORIZATION-REVIEW]`,
+`[AUTHORIZATION-NAMESPACE-REVIEW]`, `[FREELENS-PROXY]` with
+`Cluster <id> is not connected` or `The client is destroyed`); those errors
+come and go with the timing of a run and say nothing about the extension, and
+the session no longer collects them.
+
+The code the sessions share is in `integration/__tests__/extension-helpers.ts`:
+connecting to the app with the error collector, installing the extension,
+connecting and disconnecting the kind cluster, kubectl, and the selectors of
+the list pages, the details drawer, the row menus and the confirmation dialog.
+Its name does not match `*.tests.ts`, so Vitest does not collect it.
+`integration/tsconfig.json` compiles the directory with Node and the DOM,
+because the callbacks of `page.evaluate` run in the page, and with the types
+of `@freelensapp/extensions`, which declare `globalThis.FreelensExtensionApi`
+for them.
+
+Four variables configure the sessions. `FREELENS_CDP_URL` is the CDP endpoint
+(`http://127.0.0.1:9223` by default), `FREELENS_MAIN_LOG` the main log,
+`TEST_KIND_CLUSTER_NAME` names the kind cluster (`kind` by default, `freelens`
+in the workflow), and `TEST_KEDA_VERSION` the KEDA release of the CRDs. Every
+kubectl call names its context, `kind-<name>`, so a run never acts on the
+current context. The checkout to install, and the fixtures, are found from the
+location of the helpers. Outside CI a session skips with a warning when
+Freelens dev does not answer or the cluster is not reachable; in CI (`CI` set)
+the run fails instead, so that a mistake in the workflow does not turn into a
+silent skip.
+
+Run locally, the tests act on the profile of Freelens dev, `FreelensDev`,
+which is apart from that of an installed Freelens: they navigate its window,
+leave this checkout installed in place, uninstalling another installation of
+the extension, and leave the kind cluster disconnected, with the namespace
+filter set to `integration-tests`. They touch no other cluster of the
+catalog. The profile lists the kind cluster only once its kubeconfig is in
+"Kubeconfig Syncs" (see "Checking the Extension in Freelens Dev"); without it
+the cluster session fails on the timeout of finding the cluster. A run deletes
+the CRDs of the four kinds, and with them every KEDA object on the cluster:
+run it only against a kind cluster with nothing worth keeping.
 
 The workflows that act on a comment (`/tag`, `/rerun`) require the comment's
 author to be OWNER, MEMBER or COLLABORATOR; `claude.yaml` goes further and
 checks write access through the API, because MEMBER and COLLABORATOR do not
 imply it. They commit and push with the `GH_TOKEN` secret, and `release.yaml`
 publishes with `NPM_TOKEN` or, without it, with npm provenance over OIDC.
+
+## Checking the Extension in Freelens Dev
+
+The functional checks of a change run against Freelens started with
+`pnpm dev` from a freelensapp/freelens checkout. That script starts Electron
+with `--remoteDebuggingPort 9223`, so an agent can drive the app over the
+Chrome DevTools Protocol. How to attach Playwright MCP to it is in Freelens's
+`DEVELOPMENT.md`, "Inspecting the running dev app from an AI agent"; start
+Freelens before the session connects. Playwright MCP writes its snapshots to
+`.playwright-mcp/`, which is git-ignored. Added to a Claude Code session that
+is already running, the server is listed as connected, but its tools appear
+only in a new session.
+
+Without the MCP server, or until that new session, a script with
+`chromium.connectOverCDP("http://127.0.0.1:9223")` of `playwright`, a
+devDependency, does the same, as the integration tests do. `browser.close()`
+of such a browser closes only the connection; the app belongs to Freelens and
+keeps running.
+
+A profile of Freelens dev syncs no kubeconfig until one is added in
+"Kubeconfig Syncs" of the Kubernetes preferences, so its catalog lists none of
+the developer's clusters; `KUBECONFIG` does not change that. For the checks,
+add a kubeconfig with the test cluster alone, such as the output of
+`kubectl config view --minify --flatten --context kind-kind`. A fresh profile,
+in a `FREELENS_INTEGRATION_TESTING_DIR` under the system's temporary
+directory, can start with it already in place: the integration tests seed
+`FreelensDev/lens-user-store.json` there with
+`preferences.syncKubeconfigEntries`, whose `filePath` is absolute ("Kubeconfig
+syncs of the dev profile" in Freelens's `DEVELOPMENT.md`).
+
+### Installing the checkout
+
+1. `pnpm install`, then `pnpm build`. After a branch switch, `node_modules`
+   can still hold another stack, and Freelens loads the extension from
+   `dist/`.
+2. On the Extensions page, enter the checkout's directory and press
+   "Install". Freelens then asks whether to load the extension in place;
+   confirm that too. The table lists the extension as enabled, with
+   "development" in the version column and `Loaded from <directory>` in its
+   title.
+3. A rebuild, by `pnpm build` or by `pnpm dev` of the extension, reloads it
+   once in the root frame and once in each cluster frame.
+
+### Driving the UI
+
+- Every cluster renders in a cross-origin `<clusterId>.renderer.freelens.app`
+  iframe. Pages, menus and details of the extension live in that frame, not
+  in the main page.
+- Pages of the extension have URLs like `/extension/<name>/<pageId>`, with the
+  package name's `@` dropped and `/` turned into `--`, for example
+  `/extension/freelensapp--keda-extension/scaled-objects`. The sidebar entries
+  navigate in `onClick`; their `href` is not the page URL. A click on an
+  entry's `[data-testid="sidebar-item-…"]` element does not navigate; a DOM
+  `click()` on the link inside it, `[data-testid="link-for-sidebar-item-…"]`,
+  does. Neither does `history.pushState` in the cluster frame.
+- The root frame navigates with `Renderer.Navigation.navigate(url)` of the
+  extension API, run in its page: `/extensions`, `/catalog`,
+  `/preferences/extension/<name>`, `/cluster/<id>`. The application menu
+  belongs to the main process, which CDP does not reach.
+- Playwright's actionability checks can fail on the hotbar, where
+  `#ScrollSpyRoot` intercepts pointer events; a DOM `click()` on the element
+  works.
+- Views fill in once the host's stores have loaded. Wait for the expected
+  content, not a fixed time, before deciding that a page is empty.
+
+### Reading the console
+
+The renderer console also carries the output of Freelens's terminal dock
+(`%cMESSAGE` lines), which can include the user's shell prompt, account names
+and paths. Keep only warnings, errors, page errors and the extension's own
+lines, and never paste the full console into a PR, an issue or a report.
+React reports key problems as console errors ("Each child in a list should
+have a unique key", "Encountered two children with the same key"); they count
+as failures of the "no error in DevTools" check.
+
+The renderer's requests to Kubernetes go through Chromium, which logs every
+response that is not a success as a console error,
+`Failed to load resource: the server responded with a status of N`, also one
+that the code that sent it handles. The text names no URL; the location of the
+message does, and the error collector of the integration tests appends it. An
+extension whose tests expect such a response on purpose, a 404 or a 409, leaves
+out that one error by its status and URL, not every "Failed to load resource".
+
+The main process logs to the terminal running Freelens, and to a file. On
+macOS it is `~/Library/Logs/Freelens/lens.log`, with the renderer's
+`lens-renderer-*.log` next to it; when the terminal is not at hand, it shows
+the extension's activation, its reloads and its own lines. Filter it as the
+console.
 
 ## Code Style
 
@@ -783,9 +1103,6 @@ Code in `src/common/` would be shared between both processes.
 5. **For TypeScript/TSX, JS, JSON, CSS, SCSS, HTML, YAML and Markdown files:** run `pnpm biome:fix` (or `biome check` directly if `biome` is installed locally)
 6. **For other formats:** run `pnpm trunk:fix` (or `trunk check` directly if `trunk` is installed locally)
 7. **Full build** when in doubt about cached state: `pnpm clean:all && pnpm install && pnpm build`
-8. **Do not use Anthropic Fable for coding tasks** — Fable may be used only for planning,
-   analysis, and thinking through problems. When writing or editing code,
-   use standard editing tools instead.
 
 ## GitHub Actions (Claude Code Action) Rules
 
@@ -922,11 +1239,11 @@ branch lists hard to scan.
 
 ### Fork PRs: Review Only
 
-A PR from a fork (different owner than `nidiodolfini`) gets a review and
+A PR from a fork (different owner than `freelensapp`) gets a review and
 nothing else: no commits, no pushes, no branches. Its code is untrusted, and
 the head of a fork PR can change between the moment a maintainer looks at it
 and the moment the workflow checks it out, so nothing taken from the checkout
-may reach `nidiodolfini/freelens-keda-extension`.
+may reach `freelensapp/freelens-keda-extension`.
 
 When a fork PR needs changes, a maintainer first copies the exact commit they
 reviewed to a branch in this repository. From then on it is a
