@@ -1,0 +1,20 @@
+declare const classNames: {
+  readonly page: "page";
+  readonly scaleTarget: "scaleTarget";
+  readonly triggers: "triggers";
+  readonly secret: "secret";
+  readonly env: "env";
+  readonly filePath: "filePath";
+  readonly vaultAddress: "vaultAddress";
+  readonly scaledObjects: "scaledObjects";
+  readonly scaledJobs: "scaledJobs";
+  readonly status: "status";
+  readonly podIdentity: "podIdentity";
+  readonly fallback: "fallback";
+  readonly ready: "ready";
+  readonly active: "active";
+  readonly age: "age";
+  readonly min: "min";
+  readonly max: "max";
+};
+export = classNames;

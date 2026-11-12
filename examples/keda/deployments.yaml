@@ -1,0 +1,47 @@
+# The workloads the example ScaledObjects scale, one each: KEDA accepts a single
+# ScaledObject per workload and rejects the others.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-app
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: example-app
+  template:
+    metadata:
+      labels:
+        app: example-app
+    spec:
+      containers:
+      - name: pause
+        image: registry.k8s.io/pause:3.10
+        resources:
+          # The cpu trigger scales on utilization, a share of the request.
+          requests:
+            cpu: 10m
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-cron
+  namespace: default
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: example-cron
+  template:
+    metadata:
+      labels:
+        app: example-cron
+    spec:
+      containers:
+      - name: pause
+        image: registry.k8s.io/pause:3.10
+        env:
+        # Read by the ClusterTriggerAuthentication example-cluster-auth.
+        - name: TZ
+          value: America/Sao_Paulo
