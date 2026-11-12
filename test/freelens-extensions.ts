@@ -81,6 +81,22 @@ function MenuItem({ children, onClick }: { children?: React.ReactNode; onClick?:
   return React.createElement("div", { onClick }, children);
 }
 
+function DrawerItem({
+  name,
+  hidden,
+  children,
+}: {
+  name?: React.ReactNode;
+  hidden?: boolean;
+  children?: React.ReactNode;
+}) {
+  return hidden ? null : React.createElement("div", null, React.createElement("span", null, name), children);
+}
+
+function LinkToObject({ content }: { content?: React.ReactNode }) {
+  return React.createElement("a", null, content);
+}
+
 interface KubeObjectListLayoutProps {
   store: { items: unknown[] };
   renderTableContents: (item: unknown) => React.ReactNode[];
@@ -108,10 +124,12 @@ export const Renderer = {
     Badge,
     BadgeBoolean,
     ConfirmDialog,
+    DrawerItem,
     Icon,
     KubeObjectAge,
     KubeObjectListLayout,
     LinkToNamespace,
+    LinkToObject,
     MenuItem,
     WithTooltip,
   },

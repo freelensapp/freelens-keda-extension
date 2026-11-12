@@ -355,7 +355,8 @@ gone from the Custom Resources tree.
 - `clusterPageMenus` has one KEDA group, with the KEDA icon, which opens the
   Scaled Objects page, and one entry per kind under it, by `parentId`.
 - The panels of ScaledObject and ScaledJob share `Triggers`, the list of their
-  scalers, and list the object's core Events, the scaling decisions and errors
+  scalers, each a badge with its type and its name over a table of its fields,
+  and list the object's core Events, the scaling decisions and errors
   the controller records, with `ScalingEvents`
   (`src/renderer/details/scaling-events.tsx`). It reads
   `Renderer.K8sApi.eventStore.getEventsByObject(object)`, which matches the
@@ -472,6 +473,12 @@ or not visibly at all.
   the icon of 2.0.0 rendered as a solid heptagon. An outline is a ring of two paths with
   `fill-rule="evenodd"`; `keda.test.ts` rejects a stroke, `fill="none"` and
   a mask.
+- **No drawer item three levels deep.** Each level of `DrawerItem` gives its
+  name a column and its value what is left of the width, so at the third level
+  the value is a few pixels wide and its text wraps letter by letter, which the
+  triggers did until 2.0.1. Fields inside an item are rows of a table, as in
+  `Triggers`, the parameters of the authentication kinds and `ScalingEvents`;
+  `triggers.test.tsx` checks the table.
 - **Every page, details panel and menu item inside an error boundary**
   ("Renderer Components").
 - **A cluster page gets the extension from its registration.** The host passes
@@ -812,8 +819,9 @@ fails on any error logged by either process:
   Scale to Zero, once its confirmation is accepted, sets
   `autoscaling.keda.sh/paused-replicas` to `0` on the ScaledObject, and Pause
   Autoscaling sets `autoscaling.keda.sh/paused` to `true` on the ScaledJob,
-  both read back with kubectl. Last, the trigger of the ScaledObject links to
-  the details of its TriggerAuthentication. Each view opens its page itself;
+  both read back with kubectl. Last, the trigger of the ScaledObject shows its
+  fields in a table and links to the details of its TriggerAuthentication.
+  Each view opens its page itself;
   the two writes come after the menu checks, which expect the objects not
   paused. They do not check the columns, every field, Resume Autoscaling or the
   Custom Resources tree. They keep an in-place installation of this checkout

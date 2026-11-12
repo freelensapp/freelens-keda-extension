@@ -16,7 +16,6 @@ import {
   clickMenuItem,
   confirmDialog,
   connectApp,
-  detailsItemValue,
   detailsObjectLink,
   disconnectKindCluster,
   expectDetailsApiVersion,
@@ -32,6 +31,7 @@ import {
   tearDownCluster,
   testNamespace,
   testObjectName,
+  triggerFieldValue,
   waitForAnnotation,
   waitForDetailsItem,
   waitForMenuItem,
@@ -175,11 +175,20 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
     expect(await waitForAnnotation("scaledjob", true, "autoscaling.keda.sh/paused")).toBe("true");
   });
 
+  it("shows the fields of the trigger of the ScaledObject in a table", async () => {
+    const row = await openListPage(frame, "scaled-objects");
+
+    await openDetails(frame, row, "Triggers");
+
+    expect(await triggerFieldValue(frame, "threshold").textContent()).toBe("10");
+    expect(await triggerFieldValue(frame, "serverAddress").textContent()).toBe("http://prometheus.monitoring:9090");
+  });
+
   it("links the trigger of the ScaledObject to its TriggerAuthentication", async () => {
     const row = await openListPage(frame, "scaled-objects");
 
-    await openDetails(frame, row, "Authentication");
-    await detailsItemValue(frame, "Authentication").locator("a").click();
+    await openDetails(frame, row, "Triggers");
+    await triggerFieldValue(frame, "Authentication").locator("a").click();
     await waitForDetailsItem(frame, "Parameters");
 
     expect(await detailsObjectLink(frame)).toBe(

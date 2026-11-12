@@ -173,9 +173,9 @@ events.
 - **ScaledJob**: the containers and the limits of the Jobs it creates, the
   polling interval, the history limits, the rollout and scaling strategies, the
   external metric names and the last active time.
-- **Triggers**, for both: one section per scaler, with its type, its name, its
-  metric type, its metadata, and a link to its TriggerAuthentication or
-  ClusterTriggerAuthentication.
+- **Triggers**, for both: one section per scaler, with its type and its name
+  over a table of its metric type, its metadata and a link to its
+  TriggerAuthentication or ClusterTriggerAuthentication.
 - **Scaling Events**, for both: the events the cluster records for the object,
   one per scaling decision of KEDA, newest first, up to 20, with their type,
   reason, message, count and last time. They read both event APIs: KEDA 2.20

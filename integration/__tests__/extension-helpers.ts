@@ -849,6 +849,18 @@ export function detailsItemValue(frame: Frame, itemName: string): Locator {
 }
 
 /**
+ * The value of a field of a trigger in the open details drawer: the cell of
+ * its row in the table of the extension's Triggers item. The host shows a
+ * printer column named Triggers too, which has no table.
+ */
+export function triggerFieldValue(frame: Frame, fieldName: string): Locator {
+  return detailsItemValue(frame, "Triggers")
+    .locator("tr")
+    .filter({ has: frame.locator("th").getByText(fieldName, { exact: true }) })
+    .locator("td");
+}
+
+/**
  * Opens the details of the row's object and waits for an item of the
  * extension's details panel.
  */
