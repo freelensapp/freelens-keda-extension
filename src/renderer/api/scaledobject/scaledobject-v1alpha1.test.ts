@@ -1,0 +1,363 @@
+import { describe, expect, it } from "vitest";
+import { ScaledObject } from "./scaledobject-v1alpha1";
+
+// `@freelensapp/extensions` is stubbed for tests (see `test/freelens-extensions.ts`),
+// which lets us construct a real `ScaledObject` instance from plain resource data.
+describe("ScaledObject (v1alpha1)", () => {
+  const buildScaledObject = (spec: ScaledObject["spec"], status?: ScaledObject["status"]) =>
+    new ScaledObject({
+      apiVersion: "keda.sh/v1alpha1",
+      kind: "ScaledObject",
+      metadata: {
+        name: "example-app",
+        namespace: "default",
+        selfLink: "/apis/keda.sh/v1alpha1/namespaces/default/scaledobjects/example-app",
+      },
+      spec,
+      status,
+    });
+
+  describe("metadata", () => {
+    it("is namespaced and serves keda.sh/v1alpha1", () => {
+      expect(ScaledObject.kind).toBe("ScaledObject");
+      expect(ScaledObject.namespaced).toBe(true);
+      expect(ScaledObject.apiBase).toBe("/apis/keda.sh/v1alpha1/scaledobjects");
+      expect(ScaledObject.crd.apiVersions).toEqual(["keda.sh/v1alpha1"]);
+      expect(ScaledObject.crd.plural).toBe("scaledobjects");
+      expect(ScaledObject.crd.shortNames).toEqual(["so"]);
+    });
+  });
+
+  describe("getStatusText", () => {
+    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] };
+
+    it("returns the reason of a Ready condition with status False", () => {
+      const object = buildScaledObject(spec, {
+        conditions: [{ type: "Ready", status: "False", reason: "ScaledObjectCheckFailed" }],
+      });
+      expect(ScaledObject.getStatusText(object)).toBe("ScaledObjectCheckFailed");
+    });
+
+    it("defaults to Error for a False Ready condition without a reason", () => {
+      const object = buildScaledObject(spec, { conditions: [{ type: "Ready", status: "False" }] });
+      expect(ScaledObject.getStatusText(object)).toBe("Error");
+    });
+
+    it("returns Ready for a Ready condition with status True", () => {
+      const object = buildScaledObject(spec, { conditions: [{ type: "Ready", status: "True" }] });
+      expect(ScaledObject.getStatusText(object)).toBe("Ready");
+    });
+
+    it("returns Active for an Active condition with status True", () => {
+      const object = buildScaledObject(spec, {
+        conditions: [
+          { type: "Ready", status: "True" },
+          { type: "Active", status: "True" },
+        ],
+      });
+      expect(ScaledObject.getStatusText(object)).toBe("Active");
+    });
+
+    it("returns Fallback for a Fallback condition with status True", () => {
+      const object = buildScaledObject(spec, {
+        conditions: [
+          { type: "Ready", status: "True" },
+          { type: "Fallback", status: "True" },
+        ],
+      });
+      expect(ScaledObject.getStatusText(object)).toBe("Fallback");
+    });
+
+    it("returns Paused for a Paused condition with status True", () => {
+      const object = buildScaledObject(spec, {
+        conditions: [
+          { type: "Ready", status: "True" },
+          { type: "Paused", status: "True" },
+        ],
+      });
+      expect(ScaledObject.getStatusText(object)).toBe("Paused");
+    });
+
+    it("returns Unknown when there are no conditions", () => {
+      expect(ScaledObject.getStatusText(buildScaledObject(spec))).toBe("Unknown");
+    });
+  });
+
+  describe("getStatusClass", () => {
+    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] };
+
+    it("maps a False Ready condition to error", () => {
+      const object = buildScaledObject(spec, { conditions: [{ type: "Ready", status: "False" }] });
+      expect(ScaledObject.getStatusClass(object)).toBe("error");
+    });
+
+    it("maps a True Ready condition to success", () => {
+      const object = buildScaledObject(spec, { conditions: [{ type: "Ready", status: "True" }] });
+      expect(ScaledObject.getStatusClass(object)).toBe("success");
+    });
+
+    it("maps a True Active condition to success", () => {
+      const object = buildScaledObject(spec, {
+        conditions: [
+          { type: "Ready", status: "True" },
+          { type: "Active", status: "True" },
+        ],
+      });
+      expect(ScaledObject.getStatusClass(object)).toBe("success");
+    });
+
+    it("maps a True Fallback condition to warning", () => {
+      const object = buildScaledObject(spec, {
+        conditions: [
+          { type: "Ready", status: "True" },
+          { type: "Fallback", status: "True" },
+        ],
+      });
+      expect(ScaledObject.getStatusClass(object)).toBe("warning");
+    });
+
+    it("maps a True Paused condition to info", () => {
+      const object = buildScaledObject(spec, {
+        conditions: [
+          { type: "Ready", status: "True" },
+          { type: "Paused", status: "True" },
+        ],
+      });
+      expect(ScaledObject.getStatusClass(object)).toBe("info");
+    });
+
+    it("maps a missing condition to no class", () => {
+      expect(ScaledObject.getStatusClass(buildScaledObject(spec))).toBe("");
+    });
+  });
+
+  describe("getTriggerSummary", () => {
+    it("joins the trigger types of the spec", () => {
+      const object = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [
+          { type: "cpu", metadata: {} },
+          { type: "cron", metadata: { desired: "1" } },
+        ],
+      });
+      expect(ScaledObject.getTriggerSummary(object)).toBe("cpu, cron");
+    });
+
+    it("prefers the trigger types the controller wrote into the status", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        { triggersTypes: ["cpu", "memory"] },
+      );
+      expect(ScaledObject.getTriggerSummary(object)).toBe("cpu, memory");
+    });
+
+    it("splits the comma-separated string some KEDA versions write into the status", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        { triggersTypes: "cpu,memory,prometheus" },
+      );
+      expect(ScaledObject.getTriggerTypes(object)).toEqual(["cpu", "memory", "prometheus"]);
+      expect(ScaledObject.getTriggerSummary(object)).toBe("cpu, memory, prometheus");
+    });
+
+    it("trims and drops empty items of a string status value", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        { triggersTypes: " cpu , ,cron " },
+      );
+      expect(ScaledObject.getTriggerTypes(object)).toEqual(["cpu", "cron"]);
+    });
+
+    it("falls back to the spec triggers when the status has no types", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        { triggersTypes: undefined },
+      );
+      expect(ScaledObject.getTriggerSummary(object)).toBe("cpu");
+    });
+  });
+
+  describe("getScaleTarget", () => {
+    // The controller writes the resolved kind as a GVK string, `<group>/<version>.<kind>`.
+    it("takes the kind out of the GVK the controller resolved in the status", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        { scaleTargetKind: "apps/v1.Deployment" },
+      );
+      expect(ScaledObject.getScaleTargetKind(object)).toBe("Deployment");
+      expect(ScaledObject.getScaleTarget(object)).toBe("Deployment/example-app");
+    });
+
+    it("takes the kind out of a GVK whose group has dots", () => {
+      const object = buildScaledObject(
+        {
+          scaleTargetRef: { name: "example-app", apiVersion: "argoproj.io/v1alpha1", kind: "Rollout" },
+          triggers: [{ type: "cpu", metadata: {} }],
+        },
+        { scaleTargetKind: "argoproj.io/v1alpha1.Rollout" },
+      );
+      expect(ScaledObject.getScaleTarget(object)).toBe("Rollout/example-app");
+    });
+
+    // A ScaledObject the controller rejects, such as a second one on the same workload, never gets a
+    // resolved kind, and reads the same as one it accepted.
+    it("reads the same before the controller has resolved the kind", () => {
+      const resolved = buildScaledObject(
+        { scaleTargetRef: { name: "example-app", kind: "Deployment" }, triggers: [{ type: "cpu", metadata: {} }] },
+        { scaleTargetKind: "apps/v1.Deployment" },
+      );
+      const unresolved = buildScaledObject({
+        scaleTargetRef: { name: "example-app", kind: "Deployment" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      expect(ScaledObject.getScaleTarget(unresolved)).toBe(ScaledObject.getScaleTarget(resolved));
+    });
+
+    it("uses the kind of the spec when the status has none", () => {
+      const object = buildScaledObject({
+        scaleTargetRef: { name: "example-app", kind: "Deployment" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      expect(ScaledObject.getScaleTarget(object)).toBe("Deployment/example-app");
+    });
+
+    it("defaults the kind to Deployment", () => {
+      const object = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      expect(ScaledObject.getScaleTarget(object)).toBe("Deployment/example-app");
+    });
+  });
+
+  describe("getScaleTargetRef", () => {
+    it("refers to the workload by the group and version the controller resolved", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        {
+          scaleTargetKind: "apps/v1.Deployment",
+          scaleTargetGVKR: { group: "apps", version: "v1", kind: "Deployment", resource: "deployments" },
+        },
+      );
+      expect(ScaledObject.getScaleTargetRef(object)).toEqual({
+        kind: "Deployment",
+        name: "example-app",
+        apiVersion: "apps/v1",
+      });
+    });
+
+    it("leaves the empty group of a core kind out of the apiVersion", () => {
+      const object = buildScaledObject(
+        {
+          scaleTargetRef: { name: "example-rc", kind: "ReplicationController" },
+          triggers: [{ type: "cpu", metadata: {} }],
+        },
+        {
+          scaleTargetGVKR: {
+            group: "",
+            version: "v1",
+            kind: "ReplicationController",
+            resource: "replicationcontrollers",
+          },
+        },
+      );
+      expect(ScaledObject.getScaleTargetRef(object).apiVersion).toBe("v1");
+    });
+
+    it("takes the apiVersion of the spec before the controller has resolved it, or the default apps/v1", () => {
+      const rollout = buildScaledObject({
+        scaleTargetRef: { name: "example-app", apiVersion: "argoproj.io/v1alpha1", kind: "Rollout" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      const deployment = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      expect(ScaledObject.getScaleTargetRef(rollout)).toEqual({
+        kind: "Rollout",
+        name: "example-app",
+        apiVersion: "argoproj.io/v1alpha1",
+      });
+      expect(ScaledObject.getScaleTargetRef(deployment)).toEqual({
+        kind: "Deployment",
+        name: "example-app",
+        apiVersion: "apps/v1",
+      });
+    });
+  });
+
+  describe("getHpaRef", () => {
+    const spec = { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] };
+
+    it("refers to the HPA the controller named in the status", () => {
+      expect(ScaledObject.getHpaRef(buildScaledObject(spec, { hpaName: "keda-hpa-example-app-cpu" }))).toEqual({
+        kind: "HorizontalPodAutoscaler",
+        apiVersion: "autoscaling/v2",
+        name: "keda-hpa-example-app-cpu",
+      });
+    });
+
+    it("is undefined until the controller has created the HPA", () => {
+      expect(ScaledObject.getHpaRef(buildScaledObject(spec))).toBeUndefined();
+    });
+  });
+
+  describe("status list normalization", () => {
+    it("splits string authentication types and metric names", () => {
+      const object = buildScaledObject(
+        { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+        { authenticationsTypes: "aws-keda-auth", externalMetricNames: "s0-cpu,s0-memory" },
+      );
+      expect(ScaledObject.getAuthenticationTypes(object)).toEqual(["aws-keda-auth"]);
+      expect(ScaledObject.getExternalMetricNames(object)).toEqual(["s0-cpu", "s0-memory"]);
+    });
+
+    it("returns an empty list when the status has none", () => {
+      const object = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      expect(ScaledObject.getAuthenticationTypes(object)).toEqual([]);
+      expect(ScaledObject.getExternalMetricNames(object)).toEqual([]);
+    });
+  });
+
+  describe("getPausedAnnotation", () => {
+    const buildAnnotated = (annotations: Record<string, string>) =>
+      new ScaledObject({
+        apiVersion: "keda.sh/v1alpha1",
+        kind: "ScaledObject",
+        metadata: {
+          name: "example-app",
+          namespace: "default",
+          selfLink: "/apis/keda.sh/v1alpha1/namespaces/default/scaledobjects/example-app",
+          annotations,
+        },
+        spec: { scaleTargetRef: { name: "example-app" }, triggers: [{ type: "cpu", metadata: {} }] },
+      });
+
+    it("is true when the paused-replicas annotation is present", () => {
+      expect(ScaledObject.getPausedAnnotation(buildAnnotated({ "autoscaling.keda.sh/paused-replicas": "0" }))).toBe(
+        true,
+      );
+    });
+
+    it("is true when the paused annotation is true", () => {
+      expect(ScaledObject.getPausedAnnotation(buildAnnotated({ "autoscaling.keda.sh/paused": "true" }))).toBe(true);
+    });
+
+    // The controller parses the value as a boolean: "false" resumes, which KEDA documents as an alternative to
+    // removing the annotation.
+    it("is false when the paused annotation is false", () => {
+      expect(ScaledObject.getPausedAnnotation(buildAnnotated({ "autoscaling.keda.sh/paused": "False" }))).toBe(false);
+    });
+
+    it("is false when the annotation is absent", () => {
+      const object = buildScaledObject({
+        scaleTargetRef: { name: "example-app" },
+        triggers: [{ type: "cpu", metadata: {} }],
+      });
+      expect(ScaledObject.getPausedAnnotation(object)).toBe(false);
+    });
+  });
+});

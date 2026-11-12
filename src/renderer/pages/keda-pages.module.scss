@@ -1,0 +1,38 @@
+// The widths of the columns of the list pages, as shares of the row.
+.page {
+  :global(.TableCell) {
+    &.scaleTarget,
+    &.triggers,
+    &.secret,
+    &.env,
+    &.filePath,
+    &.vaultAddress,
+    &.scaledObjects,
+    &.scaledJobs {
+      flex-grow: 0.8;
+    }
+
+    &.status {
+      flex-grow: 0.7;
+    }
+
+    &.podIdentity {
+      flex-grow: 0.5;
+    }
+
+    &.fallback {
+      flex-grow: 0.4;
+    }
+
+    &.ready,
+    &.active,
+    &.age {
+      flex-grow: 0.3;
+    }
+
+    &.min,
+    &.max {
+      flex-grow: 0.2;
+    }
+  }
+}
