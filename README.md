@@ -23,6 +23,8 @@ panel with its triggers, its authentication parameters and its scaling events,
 and the menu of a ScaledObject or a ScaledJob pauses, scales to zero or resumes
 its autoscaling.
 
+[Video Demo](https://github.com/user-attachments/assets/42545139-f432-4023-886c-cfa76d9db695)
+
 ![The Scaled Objects of a cluster, with their scale target, replica range, triggers and status, dark theme](assets/screenshots/scaled-objects.png)
 
 ![The menu of a ScaledObject, with Pause Autoscaling and Scale to Zero next to the items of Freelens, dark theme](assets/screenshots/scaled-object-menu.png)
