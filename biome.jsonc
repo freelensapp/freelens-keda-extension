@@ -29,16 +29,15 @@
     // The Kubernetes manifests keep their sequences unindented, which Biome
     // cannot do, so yamlfmt formats them with the .yamlfmt.yaml of their
     // directory. pnpm writes its own lockfile and workspace file, and Trunk
-    // rewrites its own .trunk/trunk.yaml on every trunk upgrade. The SVG icon
-    // stays minified.
+    // rewrites its own .trunk/trunk.yaml on every trunk upgrade.
     "includes": [
       "**",
       "!**/.trunk/**",
       "!**/build/**",
       "!**/dist/**",
-      "!**/*.svg",
       "**/build/*.{js,cjs,mjs}",
       "!**/examples/**",
+      "!**/integration/fixtures/**",
       "!**/pnpm-lock.yaml",
       "!**/pnpm-workspace.yaml"
     ]
@@ -127,13 +126,6 @@
       }
     }
   },
-  "markdown": {
-    "parser": {
-      // A Markdown file may start with YAML frontmatter, which Biome otherwise
-      // reads as a thematic break and a setext heading.
-      "frontmatter": true
-    }
-  },
   // Every path in an override starts with `**/`: Trunk runs Biome from a
   // sandbox outside the repository, where a path anchored at the repository
   // root matches no file and the override silently does nothing.
@@ -174,8 +166,9 @@
     },
     {
       // Tests and test support, which import their Vitest functions from
-      // "vitest" explicitly.
-      "includes": ["**/src/**/*.test.*", "**/test/**"],
+      // "vitest" explicitly. The integration tests run in Node and drive
+      // Freelens dev over CDP.
+      "includes": ["**/integration/**", "**/src/**/*.test.*", "**/test/**"],
       "linter": {
         "rules": {
           "style": {
