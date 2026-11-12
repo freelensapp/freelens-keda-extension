@@ -1,0 +1,12 @@
+# The cluster-scoped test object. Deleting the CRDs at the end of a session
+# deletes it too. It names a Secret in the namespace of the KEDA operator,
+# which the session does not create.
+apiVersion: keda.sh/v1alpha1
+kind: ClusterTriggerAuthentication
+metadata:
+  name: test
+spec:
+  secretTargetRef:
+  - parameter: connection
+    name: test
+    key: connection
