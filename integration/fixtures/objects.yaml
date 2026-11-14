@@ -1,0 +1,61 @@
+# The namespaced test objects, one of each kind, which the session applies in
+# its namespace. No controller runs, so they have no status: the views read
+# what the API stores. The ScaledObject scales a Deployment that does not
+# exist, and its trigger takes its connection from the TriggerAuthentication,
+# which takes it from the Secret.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test
+type: Opaque
+stringData:
+  connection: test
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: test
+spec:
+  secretTargetRef:
+  - parameter: connection
+    name: test
+    key: connection
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: test
+spec:
+  scaleTargetRef:
+    name: test
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring:9090
+      query: sum(rate(http_requests_total[1m]))
+      threshold: "10"
+    authenticationRef:
+      name: test
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: test
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        containers:
+        - name: test
+          image: busybox
+          command:
+          - sleep
+          - "1"
+        restartPolicy: Never
+  triggers:
+  - type: cron
+    metadata:
+      timezone: Etc/UTC
+      start: 0 8 * * *
+      end: 0 18 * * *
+      desiredReplicas: "1"

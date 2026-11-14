@@ -1,0 +1,32 @@
+.trigger + .trigger {
+  margin-top: 12px;
+}
+
+.title {
+  margin-bottom: 4px;
+}
+
+// One row per field: the name keeps its line, and the value wraps.
+.fields {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+
+  th {
+    width: 1%;
+    padding: 4px 8px;
+    color: var(--textColorTertiary);
+    font-weight: 500;
+    text-align: left;
+    white-space: nowrap;
+    vertical-align: top;
+    border-top: 1px solid var(--borderFaintColor);
+  }
+
+  td {
+    padding: 4px 8px;
+    vertical-align: top;
+    word-break: break-word;
+    border-top: 1px solid var(--borderFaintColor);
+  }
+}
