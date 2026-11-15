@@ -1,6 +1,6 @@
 {
   "name": "@freelensapp/keda-extension",
-  "version": "2.0.2",
+  "version": "2.0.3-0",
   "description": "Freelens extension for KEDA",
   "repository": {
     "type": "git",
