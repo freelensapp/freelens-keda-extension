@@ -861,6 +861,17 @@ export function triggerFieldValue(frame: Frame, fieldName: string): Locator {
 }
 
 /**
+ * The row of an object in the Related Objects table of the open details
+ * drawer, by what the object is to the one of the drawer: Scale Target, or the
+ * parameter an authentication resolves.
+ */
+export function relatedObjectRow(frame: Frame, role: string): Locator {
+  return detailsDrawer(frame)
+    .locator("tr")
+    .filter({ has: frame.locator("th").getByText(role, { exact: true }) });
+}
+
+/**
  * Opens the details of the row's object and waits for an item of the
  * extension's details panel.
  */

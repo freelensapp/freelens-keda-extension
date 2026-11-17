@@ -1,6 +1,7 @@
 import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
 import { ScaledJob } from "../api/scaledjob/scaledjob-v1alpha1";
+import { RelatedObjects } from "./related-objects";
 import { ScalingEvents } from "./scaling-events";
 import { Triggers } from "./triggers";
 
@@ -63,6 +64,7 @@ export const ScaledJobDetails = observer(({ object }: ScaledJobDetailsProps) => 
       <Triggers object={object} triggers={spec.triggers ?? []} />
       <DrawerItem name="External Metric Names">{ScaledJob.getExternalMetricNames(object).join(", ") || "-"}</DrawerItem>
       <DrawerItem name="Last Active Time">{object.status?.lastActiveTime ?? "-"}</DrawerItem>
+      <RelatedObjects object={object} />
       <ScalingEvents object={object} />
     </>
   );
