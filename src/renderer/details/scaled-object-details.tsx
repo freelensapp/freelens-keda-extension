@@ -3,6 +3,7 @@ import * as MobxReact from "mobx-react";
 import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
 import { ScalingEvents } from "./scaling-events";
 import { Triggers } from "./triggers";
+import { useTriggerValues } from "./use-trigger-values";
 
 const { observer } = MobxReact;
 
@@ -27,6 +28,7 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
   const { fallback } = spec;
   const modifiers = spec.advanced?.scalingModifiers;
   const health = Object.entries(status?.health ?? {});
+  const triggerValues = useTriggerValues(object);
 
   return (
     <>
@@ -55,7 +57,7 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
         {modifiers?.activationTarget ? `, activation target ${modifiers.activationTarget}` : ""}
         {modifiers?.metricType ? ` (${modifiers.metricType})` : ""}
       </DrawerItem>
-      <Triggers object={object} triggers={spec.triggers ?? []} />
+      <Triggers object={object} triggers={spec.triggers ?? []} values={triggerValues} />
       <DrawerItem name="Fallback">
         {fallback
           ? `${fallback.replicas} replicas after ${fallback.failureThreshold} failures (${fallback.behavior ?? "static"})`
