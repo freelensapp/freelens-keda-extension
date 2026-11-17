@@ -97,6 +97,10 @@ function LinkToObject({ content }: { content?: React.ReactNode }) {
   return React.createElement("a", null, content);
 }
 
+function DrawerTitle({ children }: { children?: React.ReactNode }) {
+  return React.createElement("h3", null, children);
+}
+
 interface KubeObjectListLayoutProps {
   store: { items: unknown[] };
   renderTableContents: (item: unknown) => React.ReactNode[];
@@ -125,6 +129,7 @@ export const Renderer = {
     BadgeBoolean,
     ConfirmDialog,
     DrawerItem,
+    DrawerTitle,
     Icon,
     KubeObjectAge,
     KubeObjectListLayout,
@@ -137,6 +142,8 @@ export const Renderer = {
     LensExtensionKubeObject,
     KubeApi: class KubeApi {},
     KubeObjectStore: class KubeObjectStore {},
+    // Knows no kind; a test that needs objects spies on `getApiByKind`.
+    apiManager: { getApiByKind: (): unknown => undefined },
   },
 };
 
