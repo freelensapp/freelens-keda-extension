@@ -22,11 +22,12 @@ export interface TriggersProps {
  * metadata and the authentication it refers to. A table, and not drawer items
  * nested in the item, because every level of drawer items splits the width
  * of the drawer again: on the third one the keys and the values wrapped letter
- * by letter.
+ * by letter. The item is not named Triggers: the host shows the printer
+ * column of that name, the types alone, in the same drawer.
  */
 export function Triggers({ object, triggers }: TriggersProps) {
   return (
-    <DrawerItem name="Triggers" hidden={triggers.length === 0}>
+    <DrawerItem name="Trigger Details" hidden={triggers.length === 0}>
       {triggers.map((trigger, index) => {
         const fields: [string, ReactNode][] = [];
 

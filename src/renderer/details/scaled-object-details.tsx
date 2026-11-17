@@ -1,7 +1,6 @@
 import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
 import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
-import { ScalingEvents } from "./scaling-events";
 import { Triggers } from "./triggers";
 
 const { observer } = MobxReact;
@@ -19,7 +18,8 @@ const seconds = (value: number | undefined) => (value === undefined ? "-" : `${v
  * shows the printer columns of the CRD (the kind and name of the scale target,
  * min and max, the Ready, Active, Fallback and Paused conditions, the trigger
  * and authentication types) and the conditions themselves, with their reasons
- * and messages.
+ * and messages, and its events. The Fallback column is the condition, so the
+ * settings of the fallback have a name of their own.
  */
 export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProps) => {
   const { spec, status } = object;
@@ -56,10 +56,9 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
         {modifiers?.metricType ? ` (${modifiers.metricType})` : ""}
       </DrawerItem>
       <Triggers object={object} triggers={spec.triggers ?? []} />
-      <DrawerItem name="Fallback">
-        {fallback
-          ? `${fallback.replicas} replicas after ${fallback.failureThreshold} failures (${fallback.behavior ?? "static"})`
-          : "Disabled"}
+      <DrawerItem name="Fallback Replicas" hidden={!fallback}>
+        {fallback &&
+          `${fallback.replicas} after ${fallback.failureThreshold} failures (${fallback.behavior ?? "static"})`}
       </DrawerItem>
       <DrawerItem name="Health" hidden={health.length === 0}>
         {health
@@ -74,7 +73,6 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
       </DrawerItem>
       <DrawerItem name="Original Replica Count">{status?.originalReplicaCount ?? "-"}</DrawerItem>
       <DrawerItem name="Last Active Time">{status?.lastActiveTime ?? "-"}</DrawerItem>
-      <ScalingEvents object={object} />
     </>
   );
 });

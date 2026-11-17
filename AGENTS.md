@@ -93,10 +93,9 @@ src/
   renderer/api/types.ts              # KEDA spec and status types
   renderer/api/status-helpers.ts     # Conditions, status lists and the pause annotation, for ScaledObject and ScaledJob
   renderer/api/trigger-authentication.ts # The logic of both trigger authentication kinds, and their parameters
-  renderer/api/events.ts             # When an event was last seen, and the newest events, for both event APIs
   renderer/api/<kind>/<kind>-<version>.ts # Model and KubeApi of a kind, with its tests
   renderer/pages/                    # One list page per kind, both authentication kinds in one file, and their CSS module
-  renderer/details/                  # One panel per kind, one for both authentication kinds, Triggers, ScalingEvents
+  renderer/details/                  # One panel per kind, one for both authentication kinds, Triggers
   renderer/menus/                    # PauseMenuItem: Pause, Scale to Zero and Resume, for ScaledObject and ScaledJob
   renderer/components/               # createAvailableVersionPage, ErrorBoundary and its wrappers, ErrorPage
   renderer/icons/                    # The SVG icon, imported with ?raw, and its component
@@ -355,17 +354,16 @@ gone from the Custom Resources tree.
 - `clusterPageMenus` has one KEDA group, with the KEDA icon, which opens the
   Scaled Objects page, and one entry per kind under it, by `parentId`.
 - The panels of ScaledObject and ScaledJob share `Triggers`, the list of their
-  scalers, each a badge with its type and its name over a table of its fields,
-  and list the object's core Events, the scaling decisions and errors
-  the controller records, with `ScalingEvents`
-  (`src/renderer/details/scaling-events.tsx`). It reads
-  `Renderer.K8sApi.eventStore.getEventsByObject(object)`, which matches the
-  events by the object's uid; the host loads and watches that store for the
-  Events section it adds at the end of every drawer. When an event was last
-  seen comes from `getEventLastSeen` in `src/renderer/api/events.ts`, as
-  `kubectl get events` reads it: KEDA 2.21 records events through the
-  events.k8s.io/v1 API, which writes `eventTime` and `series` and leaves
-  `lastTimestamp` empty, and older releases through core/v1.
+  scalers, each a badge with its type and its name over a table of its fields.
+  Its item is named Trigger Details, because the host shows the printer column
+  Triggers, the types alone, in the same drawer. The scaling decisions and
+  errors the controller records are the object's Events, which the host lists
+  at the end of every drawer; the panels do not list them again.
+- An item of a panel never has the name of a printer column with other
+  contents: the fallback settings of a ScaledObject are Fallback Replicas, next
+  to the Fallback column, which is the condition, and the panel of the
+  authentication kinds shows the settings of pod identity without its provider,
+  which is the PodIdentity column.
 - A link to another object is `Renderer.Component.LinkToObject`, with an
   `objectRef` of its kind, name and apiVersion and the object of the panel,
   whose namespace it takes: the host finds the API of the kind, one of its own
@@ -477,7 +475,7 @@ or not visibly at all.
   name a column and its value what is left of the width, so at the third level
   the value is a few pixels wide and its text wraps letter by letter, which the
   triggers did until 2.0.1. Fields inside an item are rows of a table, as in
-  `Triggers`, the parameters of the authentication kinds and `ScalingEvents`;
+  `Triggers` and the parameters of the authentication kinds;
   `triggers.test.tsx` checks the table.
 - **Every page, details panel and menu item inside an error boundary**
   ("Renderer Components").
