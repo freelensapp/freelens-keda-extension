@@ -17,8 +17,9 @@ Kubernetes Event-driven Autoscaling, which scales a workload on the events and
 the metrics of the systems it reads from, down to zero and back up.
 
 The extension lives in the cluster sidebar under **KEDA**: **Scaled Objects**,
-**Scaled Jobs**, **Trigger Authentications** and **Cluster Trigger
-Authentications**, with the columns of `kubectl get`. Each kind has a details
+**Scaled Jobs**, **Trigger Authentications**, **Cluster Trigger
+Authentications**, **Cloud Event Sources** and **Cluster Cloud Event Sources**,
+with the columns of `kubectl get`. Each kind has a details
 panel with its triggers, its authentication parameters and its scaling events,
 and the menu of a ScaledObject or a ScaledJob pauses, scales to zero or resumes
 its autoscaling.
@@ -43,24 +44,27 @@ its autoscaling.
 - Freelens 2.0.0 or a later 2.x (extension API v2). Freelens 1.x needs a 1.x
   version of the extension, `freelens-keda-extension` 1.0.3, which is no
   longer maintained.
-- KEDA 2.x, which serves `keda.sh/v1alpha1`. The extension follows KEDA 2.21.
+- KEDA 2.x, which serves `keda.sh/v1alpha1` and `eventing.keda.sh/v1alpha1`.
+  The extension follows KEDA 2.21.
 
 ## Supported APIs
 
-| Group     | API Version | Kind                           | Shown in                        |
-| --------- | ----------- | ------------------------------ | ------------------------------- |
-| `keda.sh` | v1alpha1    | `ScaledObject`                 | Scaled Objects                  |
-| `keda.sh` | v1alpha1    | `ScaledJob`                    | Scaled Jobs                     |
-| `keda.sh` | v1alpha1    | `TriggerAuthentication`        | Trigger Authentications         |
-| `keda.sh` | v1alpha1    | `ClusterTriggerAuthentication` | Cluster Trigger Authentications |
+| Group              | API Version | Kind                           | Shown in                        |
+| ------------------ | ----------- | ------------------------------ | ------------------------------- |
+| `keda.sh`          | v1alpha1    | `ScaledObject`                 | Scaled Objects                  |
+| `keda.sh`          | v1alpha1    | `ScaledJob`                    | Scaled Jobs                     |
+| `keda.sh`          | v1alpha1    | `TriggerAuthentication`        | Trigger Authentications         |
+| `keda.sh`          | v1alpha1    | `ClusterTriggerAuthentication` | Cluster Trigger Authentications |
+| `eventing.keda.sh` | v1alpha1    | `CloudEventSource`             | Cloud Event Sources             |
+| `eventing.keda.sh` | v1alpha1    | `ClusterCloudEventSource`      | Cluster Cloud Event Sources     |
 
 When the cluster does not serve a kind, its page says so. While the extension
-is enabled, the four kinds are left out of the Custom Resources tree of the
+is enabled, the six kinds are left out of the Custom Resources tree of the
 cluster sidebar, so each of them is listed once, under KEDA.
 
 ## Permissions
 
-The pages list and watch the four kinds, and the details panels read the
+The pages list and watch the six kinds, and the details panels read the
 events of an object from the events Freelens already loads. The menu items of
 a ScaledObject or a ScaledJob patch its annotations, so they need `patch` on
 `scaledobjects` or `scaledjobs` in its namespace; without it, Freelens shows
@@ -113,6 +117,8 @@ kubectl apply -f examples/keda/clustertriggerauthentication.yaml
 kubectl apply -f examples/keda/scaledobject-cpu.yaml
 kubectl apply -f examples/keda/scaledobject-cron.yaml
 kubectl apply -f examples/keda/scaledjob.yaml
+kubectl apply -f examples/keda/cloudeventsource.yaml
+kubectl apply -f examples/keda/clustercloudeventsource.yaml
 ```
 
 | File                                | Objects                                                                                                                                                      |
@@ -123,6 +129,14 @@ kubectl apply -f examples/keda/scaledjob.yaml
 | `scaledobject-cpu.yaml`             | `example-app-cpu`, which keeps `example-app` between 1 and 5 replicas following CPU utilization at 50% (the HPA reads the CPU from metrics-server)           |
 | `scaledobject-cron.yaml`            | `example-cron`, which wakes one replica of `example-cron` between 00:30 and 00:45 (America/Sao_Paulo), with `example-cluster-auth`                           |
 | `scaledjob.yaml`                    | `example-job`, which runs one Job at a time in the first ten minutes of every hour, with `example-auth`                                                      |
+| `cloudeventsource.yaml`             | `example-events`, which sends the `ready` and `failed` events of ScaledObjects to an HTTP endpoint where no receiver listens                                 |
+| `clustercloudeventsource.yaml`      | `example-cluster-events`, the cluster-scoped kind, which sends every event there but one excluded type                                                       |
+
+The two event sources are the exception to "without any outside system": the
+controller of KEDA 2.21 sends every active one the events of the objects of
+every namespace, whatever the namespace of a CloudEventSource, so apply them
+only on a cluster where that is fine. With no receiver at their address, the
+controller marks them as not active after the first send that fails.
 
 The cron scaler takes no credentials: the authentication refs of the cron
 triggers are there for the links between the objects, and resolve without any
@@ -151,6 +165,10 @@ the autoscaling back.
   from `kubectl get ta -o wide`.
 - **Cluster Trigger Authentications** (`cta`): the same without Namespace, with
   the File Path, from `kubectl get cta -o wide`.
+- **Cloud Event Sources**: Name, Namespace, Destination, Active and Age: the
+  columns of `kubectl get cloudeventsource`, with the HTTP endpoint or the
+  Azure Event Grid topic the events go to.
+- **Cluster Cloud Event Sources**: the same without Namespace.
 
 Status sums up the conditions of a ScaledObject or a ScaledJob in one badge,
 with the reason of the controller (`ScaledObjectReady`,
@@ -191,6 +209,10 @@ events.
   principals, and, for a TriggerAuthentication, links to the Secrets,
   ConfigMaps and service accounts it names and to the ScaledObjects and
   ScaledJobs that use it.
+- **CloudEventSource** and **ClusterCloudEventSource**: the destination of the
+  events, an HTTP endpoint or an Azure Event Grid topic, a link to the
+  authentication of the destination, the cluster name the events carry, and
+  the event types that are included or excluded.
 
 ### Write actions
 
@@ -208,9 +230,8 @@ controller reads, the same as `kubectl annotate`:
 
 ## Limits
 
-- **`keda.sh/v1alpha1` only.** It is the only version of KEDA 2.x. The
-  CloudEventSource and ClusterCloudEventSource of `eventing.keda.sh` have no
-  page yet.
+- **`v1alpha1` only.** It is the only version KEDA 2.x serves, of `keda.sh` and
+  of `eventing.keda.sh`.
 - **No forms.** The extension creates no object and edits no field besides the
   pause annotations; the editor of Freelens, or `kubectl`, does the rest.
 - **Names only for a ClusterTriggerAuthentication.** Its Secrets and ConfigMaps
@@ -331,7 +352,7 @@ pnpm test:integration
 ```
 
 The tests install the checkout in place, replacing any other installation of
-the extension in Freelens dev. They apply the CRDs of the four kinds from the
+the extension in Freelens dev. They apply the CRDs of the six kinds from the
 sources of a KEDA release, without the controller, and delete them at the end,
 and with them every KEDA object on the cluster, so use a kind cluster with
 nothing worth keeping. Without Freelens dev or the cluster the tests are

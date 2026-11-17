@@ -1,0 +1,20 @@
+# KEDA sends its events of the included types to the HTTP endpoint, as
+# CloudEvents. The controller of KEDA 2.21 sends the events of the objects of
+# every namespace, not only of the namespace of the CloudEventSource, so apply
+# it only where that is fine. No receiver listens at the address: the
+# controller logs the first send that fails, and marks the object as not
+# active. Point the URI at a receiver of yours to see the events arrive.
+apiVersion: eventing.keda.sh/v1alpha1
+kind: CloudEventSource
+metadata:
+  name: example-events
+  namespace: default
+spec:
+  clusterName: example-cluster
+  destination:
+    http:
+      uri: http://example-receiver.default.svc.cluster.local:8080
+  eventSubscription:
+    includedEventTypes:
+    - keda.scaledobject.ready.v1
+    - keda.scaledobject.failed.v1

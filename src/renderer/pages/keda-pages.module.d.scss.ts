@@ -1,5 +1,6 @@
 declare const classNames: {
   readonly page: "page";
+  readonly destination: "destination";
   readonly scaleTarget: "scaleTarget";
   readonly triggers: "triggers";
   readonly secret: "secret";

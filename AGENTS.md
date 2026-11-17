@@ -9,7 +9,9 @@ This file provides guidance to coding agents when working with code in this repo
 A Freelens extension for KEDA (Kubernetes Event-driven Autoscaling): a list
 page and a details panel for the four kinds of `keda.sh/v1alpha1` (KEDA 2.x),
 ScaledObject, ScaledJob, TriggerAuthentication and
-ClusterTriggerAuthentication, under a KEDA group in the sidebar. The panels of
+ClusterTriggerAuthentication, and for the two of `eventing.keda.sh/v1alpha1`,
+CloudEventSource and ClusterCloudEventSource, under a KEDA group in the
+sidebar. The panels of
 ScaledObject and ScaledJob show their triggers and scaling events, those of
 the two authentication kinds every parameter and where it comes from, and
 ScaledObject and ScaledJob get the Pause Autoscaling and Resume Autoscaling
@@ -93,9 +95,10 @@ src/
   renderer/api/types.ts              # KEDA spec and status types
   renderer/api/status-helpers.ts     # Conditions, status lists and the pause annotation, for ScaledObject and ScaledJob
   renderer/api/trigger-authentication.ts # The logic of both trigger authentication kinds, and their parameters
+  renderer/api/cloud-event-source.ts # The logic of both cloud event source kinds
   renderer/api/events.ts             # When an event was last seen, and the newest events, for both event APIs
   renderer/api/<kind>/<kind>-<version>.ts # Model and KubeApi of a kind, with its tests
-  renderer/pages/                    # One list page per kind, both authentication kinds in one file, and their CSS module
+  renderer/pages/                    # One list page per kind, the two authentication kinds in one file, the two event source kinds in another, and their CSS module
   renderer/details/                  # One panel per kind, one for both authentication kinds, Triggers, ScalingEvents
   renderer/menus/                    # PauseMenuItem: Pause, Scale to Zero and Resume, for ScaledObject and ScaledJob
   renderer/components/               # createAvailableVersionPage, ErrorBoundary and its wrappers, ErrorPage
@@ -108,7 +111,7 @@ build/                               # Vite plugins: host modules, standard deco
 integration/__tests__/               # Integration tests, run against Freelens dev over CDP, and their shared module
 integration/fixtures/                # Test objects of the integration tests, one of each kind
 vite.config.mjs                      # The build, renderer and main
-examples/keda/                       # Test objects of the four kinds, and the Deployments they scale (kubectl apply -f)
+examples/keda/                       # Test objects of the six kinds, and the Deployments they scale (kubectl apply -f)
 ```
 
 Build output goes to `dist/`: `main.js`, `renderer.js` and `renderer.css`, with
@@ -119,8 +122,10 @@ source maps. `main` and `renderer` in `package.json` point at the two entries.
 A model is a subclass of `Renderer.K8sApi.LensExtensionKubeObject`, one file
 per kind and version: `src/renderer/api/scaledobject/scaledobject-v1alpha1.ts`,
 `scaledjob/scaledjob-v1alpha1.ts`,
-`triggerauthentication/triggerauthentication-v1alpha1.ts` and
-`clustertriggerauthentication/clustertriggerauthentication-v1alpha1.ts`.
+`triggerauthentication/triggerauthentication-v1alpha1.ts`,
+`clustertriggerauthentication/clustertriggerauthentication-v1alpha1.ts`,
+`cloudeventsource/cloudeventsource-v1alpha1.ts` and
+`clustercloudeventsource/clustercloudeventsource-v1alpha1.ts`.
 
 The host reads the model's metadata from the class, through `static readonly`
 properties. The objects it hands to the extension, in a list, a details panel
@@ -153,6 +158,8 @@ is not, and calling it throws. So:
   and ClusterTriggerAuthentication share their spec and status, so their logic
   is in `trigger-authentication.ts`, functions that take either kind, which the
   pages and the panel call directly; the two models carry their metadata only.
+  CloudEventSource and ClusterCloudEventSource do the same, with
+  `cloud-event-source.ts`.
 - **Constants**: the annotations the controller reads are `static readonly`
   on the model (`pausedAnnotation`, `pausedReplicasAnnotation`); the menu
   items and `getPausedAnnotation` use them, never the literal.
@@ -211,11 +218,11 @@ served. Freelens restores the last page when a cluster is opened, so this
 happens often. `src/renderer/components/available-version.test.tsx` checks it
 with a spy on `getStore` that reads an observable.
 
-`customResources` in `src/renderer/index.tsx` lists the four model classes.
+`customResources` in `src/renderer/index.tsx` lists the six model classes.
 The host reads the group and plural from each class's `crd`, and while the
 extension is enabled it leaves the resources out of the Custom Resources tree
 of the cluster sidebar, where they would otherwise be listed a second time
-under `keda.sh`. Their definitions stay in the Definitions list, and the
+under `keda.sh` and `eventing.keda.sh`. Their definitions stay in the Definitions list, and the
 host's own list and details stay reachable by URL and from the command
 palette. A model the extension only
 decorates, with a details panel or a menu item and no page of its own, stays
@@ -226,8 +233,8 @@ place.
 
 The types in `src/renderer/api/types.ts` follow the KEDA controller's Go types,
 read from its sources at the release that serves the version
-(`apis/keda/v1alpha1/*_types.go` of kedacore/keda, v2.21.0 today), not from
-memory:
+(`apis/keda/v1alpha1/*_types.go` and `apis/eventing/v1alpha1/*_types.go` of
+kedacore/keda, v2.21.0 today), not from memory:
 
 - Every Go struct has a TypeScript interface of the same name, with the same
   fields under their `json` names.
@@ -247,7 +254,11 @@ memory:
   is `HorizontalPodAutoscalerSpec["behavior"]`.
 - TriggerAuthentication and ClusterTriggerAuthentication share
   `TriggerAuthenticationSpec` and `TriggerAuthenticationStatus`, as their Go
-  types do.
+  types do, and CloudEventSource and ClusterCloudEventSource share
+  `CloudEventSourceSpec` and `CloudEventSourceStatus`.
+- A Go pointer with no `omitempty` in its `json` tag is `| null`: the API
+  stores `null` for it, as for the destination of a CloudEventSource that is
+  not set, `http` or `azureEventGridTopic`.
 - A condition is `Renderer.K8sApi.BaseKubeObjectCondition`, aliased as
   `KedaCondition`. The whole of the host's kube-object package is re-exported
   from `K8sApi`; nothing is imported from another `@freelensapp/*` package,
@@ -285,7 +296,7 @@ memory:
    accepts one ScaledObject per workload, so each test object scales a workload
    of its own.
 9. **The integration tests**: the kind's entry in `kindViews` of
-   `integration/__tests__/keda.tests.ts`, its plural in `crdPlurals` of
+   `integration/__tests__/keda.tests.ts`, its CRD in `crdNames` of
    `extension-helpers.ts`, and a test object named `test` in
    `integration/fixtures/` ("Workflows").
 
@@ -334,7 +345,8 @@ gone from the Custom Resources tree.
   `any`, and only what the host passes. A menu item does not extend
   `Renderer.Component.KubeObjectMenuProps`, the props of the host's whole
   `KubeObjectMenu`. A component may take the union of the models it serves:
-  `TriggerAuthenticationDetails` serves both authentication kinds, and
+  `TriggerAuthenticationDetails` serves both authentication kinds,
+  `CloudEventSourceDetails` both event source kinds, and
   `PauseMenuItem` serves ScaledObject and ScaledJob, picking the store to patch
   by the `kind` of the object, a literal on each model. It renders the items
   that apply to the object's kind and state, in a fragment: Pause Autoscaling,
@@ -377,6 +389,10 @@ gone from the Custom Resources tree.
   (`getAuthenticationObjectRef`). A ClusterTriggerAuthentication names
   Secrets in the namespace of the operator, which the object does not say, and
   is used by objects in any namespace, so its panel shows those names as text.
+  The panel of the event source kinds links the authentication of the
+  destination (`getAuthenticationRef` of `cloud-event-source.ts`), but for a
+  TriggerAuthentication of a ClusterCloudEventSource, which has no namespace
+  to look it up in.
 - `Renderer.Component.ConfirmDialog` lays its content out as flex items, so its
   `message` is one element, `<p>...</p>` ("Rules That Fail Silently").
 - The host renders a cluster page with `params` only. A page that needs the
@@ -809,13 +825,13 @@ fails on any error logged by either process:
 - `extensions.tests.ts` uninstalls whatever installation of the extension the
   app has and installs this checkout in place from the Extensions page. The
   extension has no preferences to open. It needs no cluster.
-- `keda.tests.ts` opens the kind cluster with the CRDs of the four kinds and a
+- `keda.tests.ts` opens the kind cluster with the CRDs of the six kinds and a
   test object of each, and clicks through the extension's views: each list
   page shows a row for its object; its details show the extension's panel, in
-  `keda.sh/v1alpha1`, with no error page of the error boundary; and each row
+  the API version of its kind, with no error page of the error boundary; and each row
   menu lists the extension's items that apply to an object that is not paused,
   Pause Autoscaling and Scale to Zero for the ScaledObject, Pause Autoscaling
-  for the ScaledJob, none for the two authentication kinds. Then it writes:
+  for the ScaledJob, none for the other four kinds. Then it writes:
   Scale to Zero, once its confirmation is accepted, sets
   `autoscaling.keda.sh/paused-replicas` to `0` on the ScaledObject, and Pause
   Autoscaling sets `autoscaling.keda.sh/paused` to `true` on the ScaledJob,
@@ -942,7 +958,7 @@ filter set to `integration-tests`. They touch no other cluster of the
 catalog. The profile lists the kind cluster only once its kubeconfig is in
 "Kubeconfig Syncs" (see "Checking the Extension in Freelens Dev"); without it
 the cluster session fails on the timeout of finding the cluster. A run deletes
-the CRDs of the four kinds, and with them every KEDA object on the cluster:
+the CRDs of the six kinds, and with them every KEDA object on the cluster:
 run it only against a kind cluster with nothing worth keeping.
 
 The workflows that act on a comment (`/tag`, `/rerun`) require the comment's

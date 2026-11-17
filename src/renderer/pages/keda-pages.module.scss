@@ -1,6 +1,10 @@
 // The widths of the columns of the list pages, as shares of the row.
 .page {
   :global(.TableCell) {
+    &.destination {
+      flex-grow: 1.6;
+    }
+
     &.scaleTarget,
     &.triggers,
     &.secret,
