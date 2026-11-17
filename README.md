@@ -66,6 +66,10 @@ a ScaledObject or a ScaledJob patch its annotations, so they need `patch` on
 `scaledobjects` or `scaledjobs` in its namespace; without it, Freelens shows
 the error of the patch. Nothing else writes to the cluster.
 
+The details of a ScaledObject read the current value of its triggers from the
+external metrics API, which needs `get` on `external.metrics.k8s.io` in its
+namespace. Without it, the triggers show as they are, with no current value.
+
 ## Install
 
 Open Freelens and go to Extensions (`ctrl`+`shift`+`E` or
@@ -177,7 +181,14 @@ events.
   external metric names and the last active time.
 - **Triggers**, for both: one section per scaler, with its type and its name
   over a table of its metric type, its metadata and a link to its
-  TriggerAuthentication or ClusterTriggerAuthentication.
+  TriggerAuthentication or ClusterTriggerAuthentication. For a ScaledObject, the
+  table starts with the **Current Value** of the trigger, the value KEDA reads
+  from the scaler, next to the target its metadata sets (`threshold`, `value`
+  and so on). It comes from the external metrics API that KEDA serves in every
+  installation, with no Prometheus or other system, and is read again at the
+  polling interval of the object while the details stay open. The cpu and
+  memory triggers are resource metrics, and the triggers of a ScaledJob are
+  not served there, so they have none.
 - **Scaling Events**, for both: the events the cluster records for the object,
   one per scaling decision of KEDA, newest first, up to 20, with their type,
   reason, message, count and last time. They read both event APIs: KEDA 2.20

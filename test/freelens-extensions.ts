@@ -15,12 +15,17 @@ import { vi } from "vitest";
 class LensExtensionKubeObject {
   apiVersion?: string;
   kind?: string;
-  metadata?: { name?: string; namespace?: string; creationTimestamp?: string };
+  metadata?: { name?: string; namespace?: string; uid?: string; creationTimestamp?: string };
   spec?: unknown;
   status?: unknown;
 
   constructor(data: Record<string, unknown> = {}) {
     Object.assign(this, data);
+  }
+
+  // As the host's, the uid.
+  getId() {
+    return this.metadata?.uid ?? "";
   }
 
   // As the host's, from the metadata.
@@ -137,6 +142,12 @@ export const Renderer = {
     LensExtensionKubeObject,
     KubeApi: class KubeApi {},
     KubeObjectStore: class KubeObjectStore {},
+    // Serves nothing; a test that needs a response spies on `get` of the prototype.
+    KubeJsonApi: class KubeJsonApi {
+      async get(): Promise<unknown> {
+        return {};
+      }
+    },
   },
 };
 

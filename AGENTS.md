@@ -93,6 +93,7 @@ src/
   renderer/api/types.ts              # KEDA spec and status types
   renderer/api/status-helpers.ts     # Conditions, status lists and the pause annotation, for ScaledObject and ScaledJob
   renderer/api/trigger-authentication.ts # The logic of both trigger authentication kinds, and their parameters
+  renderer/api/external-metrics.ts   # The current value of the triggers of a ScaledObject, from the external metrics API
   renderer/api/events.ts             # When an event was last seen, and the newest events, for both event APIs
   renderer/api/<kind>/<kind>-<version>.ts # Model and KubeApi of a kind, with its tests
   renderer/pages/                    # One list page per kind, both authentication kinds in one file, and their CSS module
@@ -366,6 +367,24 @@ gone from the Custom Resources tree.
   `kubectl get events` reads it: KEDA 2.21 records events through the
   events.k8s.io/v1 API, which writes `eventTime` and `series` and leaves
   `lastTimestamp` empty, and older releases through core/v1.
+- The ScaledObject panel passes `Triggers` the current value of each trigger,
+  which the table of the trigger shows first, as Current Value.
+  `useTriggerValues` (`src/renderer/details/use-trigger-values.ts`) reads them
+  with `getTriggerValues` of `src/renderer/api/external-metrics.ts` when the
+  panel opens and again at the polling interval of the object, 30 seconds when
+  it sets none and never under 5, until the panel closes: every read makes the
+  metrics server of KEDA ask the scaler, as a poll of the controller does.
+  The values come from `external.metrics.k8s.io/v1beta1`, one request per name
+  of `status.externalMetricNames`, with the label selector
+  `scaledobject.keda.sh/name=<name>`; the name of a metric starts with
+  `s<index>-`, the index of its trigger in `spec.triggers`. A metric that
+  cannot be read is left out, so a user who may not read the API sees the
+  triggers without a value. An object with no status makes no request, which
+  keeps the integration tests, with no controller, free of failed requests.
+  The host exports no client for a path outside a `KubeApi`, so
+  `getTriggerValues` builds a `Renderer.K8sApi.KubeJsonApi` as the host builds
+  its own for a cluster frame, on the frame's origin with the `/api-kube`
+  prefix, when it is called and never when the module loads.
 - A link to another object is `Renderer.Component.LinkToObject`, with an
   `objectRef` of its kind, name and apiVersion and the object of the panel,
   whose namespace it takes: the host finds the API of the kind, one of its own
