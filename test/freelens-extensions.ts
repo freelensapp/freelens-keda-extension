@@ -119,6 +119,16 @@ const ConfirmDialog = {
   open: vi.fn(),
 };
 
+// The host's Input, reduced to an input that reports its value as the host's does, before the event.
+function Input({
+  onChange,
+  ...props
+}: Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> & {
+  onChange?: (value: string, event: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return React.createElement("input", { ...props, onChange: (event) => onChange?.(event.target.value, event) });
+}
+
 export const Renderer = {
   Component: {
     Badge,
@@ -126,6 +136,7 @@ export const Renderer = {
     ConfirmDialog,
     DrawerItem,
     Icon,
+    Input,
     KubeObjectAge,
     KubeObjectListLayout,
     LinkToNamespace,
@@ -137,6 +148,8 @@ export const Renderer = {
     LensExtensionKubeObject,
     KubeApi: class KubeApi {},
     KubeObjectStore: class KubeObjectStore {},
+    // Finds no HPA; a test that needs one spies on `get`.
+    hpaApi: { get: async (): Promise<unknown> => null },
   },
 };
 

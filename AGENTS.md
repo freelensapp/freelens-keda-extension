@@ -13,7 +13,7 @@ ClusterTriggerAuthentication, under a KEDA group in the sidebar. The panels of
 ScaledObject and ScaledJob show their triggers and scaling events, those of
 the two authentication kinds every parameter and where it comes from, and
 ScaledObject and ScaledJob get the Pause Autoscaling and Resume Autoscaling
-menu items, with Scale to Zero for a ScaledObject.
+menu items; pausing a ScaledObject asks for the replicas to keep.
 
 - **Language**: TypeScript 7.x
 - **Runtime**: Freelens >= 2.0.0 (extension API v2, `engines.freelens: ^2.0.0`).
@@ -97,7 +97,7 @@ src/
   renderer/api/<kind>/<kind>-<version>.ts # Model and KubeApi of a kind, with its tests
   renderer/pages/                    # One list page per kind, both authentication kinds in one file, and their CSS module
   renderer/details/                  # One panel per kind, one for both authentication kinds, Triggers, ScalingEvents
-  renderer/menus/                    # PauseMenuItem: Pause, Scale to Zero and Resume, for ScaledObject and ScaledJob
+  renderer/menus/                    # PauseMenuItem: Pause and Resume, for ScaledObject and ScaledJob
   renderer/components/               # createAvailableVersionPage, ErrorBoundary and its wrappers, ErrorPage
   renderer/icons/                    # The SVG icon, imported with ?raw, and its component
   renderer/vars.scss                 # SCSS variables
@@ -274,7 +274,7 @@ memory:
    annotation, which the KEDA controller reads for ScaledObject and ScaledJob,
    and `autoscaling.keda.sh/paused-replicas`, which it reads for a ScaledObject
    only, and removes both to resume. An action that changes the
-   workload, such as Scale to Zero, asks first with
+   workload, such as Pause Autoscaling, asks first with
    `Renderer.Component.ConfirmDialog.open`, as the host does before deleting an
    object.
 6. **`customResources`**: the model class of every version that has a page.
@@ -336,10 +336,20 @@ gone from the Custom Resources tree.
   `KubeObjectMenu`. A component may take the union of the models it serves:
   `TriggerAuthenticationDetails` serves both authentication kinds, and
   `PauseMenuItem` serves ScaledObject and ScaledJob, picking the store to patch
-  by the `kind` of the object, a literal on each model. It renders the items
-  that apply to the object's kind and state, in a fragment: Pause Autoscaling,
-  and Scale to Zero for a ScaledObject, while it is not paused, Resume
-  Autoscaling while it is.
+  by the `kind` of the object, a literal on each model. It renders the item
+  that applies to the object's state: Pause Autoscaling while it is not paused,
+  Resume Autoscaling while it is. Pause Autoscaling asks first: for a
+  ScaledObject its dialog has an input for the replicas to keep, which starts
+  with the current ones, read from the HPA the controller created
+  (`Renderer.K8sApi.hpaApi.get`, when the click comes, and only when
+  `status.hpaName` is set), and it writes `paused-replicas`, or `paused` when
+  the input is left empty; for a ScaledJob it only confirms. The input starts
+  empty for an HPA with no conditions: its controller has not synced it yet,
+  for about 15 seconds after the controller of KEDA creates it, as it does on
+  a resume, and until then the status has no `currentReplicas`, as it has none
+  for a target at zero. The input lives in
+  a component of its own, the `message` of the dialog, and hands its value to
+  the `ok` callback through the closure that opened the dialog.
 - A details panel shows only what the host does not. For any custom resource
   the host renders `CustomResourceDetails` in the same drawer, with every
   printer column of the CRD and the conditions, reasons and messages
@@ -814,12 +824,12 @@ fails on any error logged by either process:
   page shows a row for its object; its details show the extension's panel, in
   `keda.sh/v1alpha1`, with no error page of the error boundary; and each row
   menu lists the extension's items that apply to an object that is not paused,
-  Pause Autoscaling and Scale to Zero for the ScaledObject, Pause Autoscaling
-  for the ScaledJob, none for the two authentication kinds. Then it writes:
-  Scale to Zero, once its confirmation is accepted, sets
-  `autoscaling.keda.sh/paused-replicas` to `0` on the ScaledObject, and Pause
-  Autoscaling sets `autoscaling.keda.sh/paused` to `true` on the ScaledJob,
-  both read back with kubectl. Last, the trigger of the ScaledObject shows its
+  Pause Autoscaling for the ScaledObject and for the ScaledJob, none for the
+  two authentication kinds. Then it writes: Pause Autoscaling, with `0` typed
+  in its dialog and the dialog accepted, sets
+  `autoscaling.keda.sh/paused-replicas` to `0` on the ScaledObject, and, once
+  its confirmation is accepted, `autoscaling.keda.sh/paused` to `true` on the
+  ScaledJob, both read back with kubectl. Last, the trigger of the ScaledObject shows its
   fields in a table and links to the details of its TriggerAuthentication.
   Each view opens its page itself;
   the two writes come after the menu checks, which expect the objects not

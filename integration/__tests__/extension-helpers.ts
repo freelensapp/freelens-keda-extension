@@ -931,6 +931,17 @@ export async function clickMenuItem(frame: Frame, menu: Locator, title: string) 
 }
 
 /**
+ * Types into the input of the confirmation dialog that a menu item opened, in
+ * place of what it holds.
+ */
+export async function fillDialogInput(frame: Frame, value: string) {
+  const input = frame.getByTestId("confirmation-dialog").locator("input");
+
+  await input.waitFor(viewTimeout);
+  await input.fill(value);
+}
+
+/**
  * Accepts the confirmation dialog that a menu item opened, after checking the
  * label of its OK button, and waits for the dialog to close.
  */
