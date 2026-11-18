@@ -53,11 +53,14 @@ const stubStore = (kubeObjectClass: typeof Renderer.K8sApi.LensExtensionKubeObje
   return patch;
 };
 
+// The conditions of an HPA its controller has synced, reduced to one.
+const synced = [{ type: "AbleToScale", status: "True" }];
+
 // The HPA the controller created for a ScaledObject, reduced to the replicas the dialog fills in.
 const stubHpa = (currentReplicas: number) =>
   vi
     .spyOn(Renderer.K8sApi.hpaApi, "get")
-    .mockResolvedValue({ status: { currentReplicas } } as Renderer.K8sApi.HorizontalPodAutoscaler);
+    .mockResolvedValue({ status: { currentReplicas, conditions: synced } } as Renderer.K8sApi.HorizontalPodAutoscaler);
 
 // The annotations the component sends to the store in its merge patch.
 const patchedAnnotations = (patch: ReturnType<typeof stubStore>) => {
@@ -144,7 +147,7 @@ describe("PauseMenuItem", () => {
     // The API leaves `currentReplicas` out of the status of an HPA whose target has no replicas.
     it("fills in 0 for a target scaled to zero, whose HPA has no current replicas in its status", async () => {
       vi.spyOn(Renderer.K8sApi.hpaApi, "get").mockResolvedValue({
-        status: { desiredReplicas: 0 },
+        status: { desiredReplicas: 0, conditions: synced },
       } as Renderer.K8sApi.HorizontalPodAutoscaler);
       render(<PauseMenuItem object={buildReconciledScaledObject()} />);
 
@@ -152,6 +155,20 @@ describe("PauseMenuItem", () => {
       render(<>{dialog.message}</>);
 
       expect(replicasInput().value).toBe("0");
+    });
+
+    // For about 15 seconds after the controller of KEDA creates an HPA, as it does on a resume, the HPA has no
+    // current replicas either, while its target has some: a 0 filled in would scale the target to zero.
+    it("starts empty for an HPA its controller has not synced yet, which has no conditions", async () => {
+      vi.spyOn(Renderer.K8sApi.hpaApi, "get").mockResolvedValue({
+        status: { desiredReplicas: 0 },
+      } as Renderer.K8sApi.HorizontalPodAutoscaler);
+      render(<PauseMenuItem object={buildReconciledScaledObject()} />);
+
+      const dialog = await openPauseDialog();
+      render(<>{dialog.message}</>);
+
+      expect(replicasInput().value).toBe("");
     });
 
     it("starts empty for an object with no HPA yet, without asking for one", async () => {

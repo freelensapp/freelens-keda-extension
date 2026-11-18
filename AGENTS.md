@@ -343,7 +343,11 @@ gone from the Custom Resources tree.
   with the current ones, read from the HPA the controller created
   (`Renderer.K8sApi.hpaApi.get`, when the click comes, and only when
   `status.hpaName` is set), and it writes `paused-replicas`, or `paused` when
-  the input is left empty; for a ScaledJob it only confirms. The input lives in
+  the input is left empty; for a ScaledJob it only confirms. The input starts
+  empty for an HPA with no conditions: its controller has not synced it yet,
+  for about 15 seconds after the controller of KEDA creates it, as it does on
+  a resume, and until then the status has no `currentReplicas`, as it has none
+  for a target at zero. The input lives in
   a component of its own, the `message` of the dialog, and hands its value to
   the `ok` callback through the closure that opened the dialog.
 - A details panel shows only what the host does not. For any custom resource

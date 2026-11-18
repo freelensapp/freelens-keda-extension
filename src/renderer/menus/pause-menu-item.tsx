@@ -11,8 +11,9 @@ export type PauseMenuItemProps = Common.Types.KubeObjectMenuItemProps<ScaledObje
 
 /**
  * The replicas of the scale target now, from the HPA the controller created
- * for the ScaledObject. Empty when the object has no HPA yet, or it cannot be
- * read: the dialog then starts empty, which keeps the replicas as they are.
+ * for the ScaledObject. Empty when the object has no HPA yet, the HPA
+ * controller has not synced it yet, or it cannot be read: the dialog then
+ * starts empty, which keeps the replicas as they are.
  */
 async function getCurrentReplicas(object: ScaledObject): Promise<string> {
   const name = object.status?.hpaName;
@@ -22,8 +23,10 @@ async function getCurrentReplicas(object: ScaledObject): Promise<string> {
   try {
     const hpa = await Renderer.K8sApi.hpaApi.get({ name, namespace: object.getNs() });
 
-    // The API leaves `currentReplicas` out of the status when it is 0.
-    return hpa?.status ? String(hpa.status.currentReplicas ?? 0) : "";
+    // The API leaves `currentReplicas` out of the status when it is 0, and also of an HPA its controller has not
+    // synced yet, for about 15 seconds after the controller of KEDA creates it, as it does on a resume. Such an HPA
+    // has no conditions either, and its target has replicas: a 0 filled in for it would scale the target to zero.
+    return hpa?.status?.conditions?.length ? String(hpa.status.currentReplicas ?? 0) : "";
   } catch {
     return "";
   }
