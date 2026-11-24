@@ -59,3 +59,18 @@ spec:
       start: 0 8 * * *
       end: 0 18 * * *
       desiredReplicas: "1"
+---
+apiVersion: eventing.keda.sh/v1alpha1
+kind: CloudEventSource
+metadata:
+  name: test
+spec:
+  destination:
+    http:
+      uri: http://receiver.integration-tests:8080
+  authenticationRef:
+    name: test
+  eventSubscription:
+    includedEventTypes:
+    - keda.scaledobject.ready.v1
+    - keda.scaledobject.failed.v1

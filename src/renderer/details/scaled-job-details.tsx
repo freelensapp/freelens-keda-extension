@@ -1,7 +1,7 @@
 import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
 import { ScaledJob } from "../api/scaledjob/scaledjob-v1alpha1";
-import { ScalingEvents } from "./scaling-events";
+import { RelatedObjects } from "./related-objects";
 import { Triggers } from "./triggers";
 
 const { observer } = MobxReact;
@@ -18,7 +18,7 @@ const seconds = (value: number | undefined) => (value === undefined ? "-" : `${v
  * The details of a ScaledJob that the host does not show already: the host
  * shows the printer columns of the CRD (min and max, the Ready, Active and
  * Paused conditions, the trigger and authentication types) and the
- * conditions themselves.
+ * conditions themselves, and its events.
  */
 export const ScaledJobDetails = observer(({ object }: ScaledJobDetailsProps) => {
   const { spec } = object;
@@ -63,7 +63,7 @@ export const ScaledJobDetails = observer(({ object }: ScaledJobDetailsProps) => 
       <Triggers object={object} triggers={spec.triggers ?? []} />
       <DrawerItem name="External Metric Names">{ScaledJob.getExternalMetricNames(object).join(", ") || "-"}</DrawerItem>
       <DrawerItem name="Last Active Time">{object.status?.lastActiveTime ?? "-"}</DrawerItem>
-      <ScalingEvents object={object} />
+      <RelatedObjects object={object} />
     </>
   );
 });

@@ -408,3 +408,75 @@ export interface TriggerAuthenticationStatus {
   scaledobjects?: string;
   scaledjobs?: string;
 }
+
+// The types of eventing.keda.sh/v1alpha1, from apis/eventing/v1alpha1 of the
+// same release.
+
+// cloudevent_types.go
+
+/**
+ * `CloudEventType`: the events of KEDA that a CloudEventSource can send.
+ */
+export type CloudEventType =
+  | "keda.scaledobject.ready.v1"
+  | "keda.scaledobject.failed.v1"
+  | "keda.scaledobject.removed.v1"
+  | "keda.scaledobject.paused.v1"
+  | "keda.scaledobject.unpaused.v1"
+  | "keda.scaledjob.ready.v1"
+  | "keda.scaledjob.failed.v1"
+  | "keda.scaledjob.removed.v1"
+  | "keda.scaledjob.paused.v1"
+  | "keda.scaledjob.unpaused.v1"
+  | "keda.scaledjob.rolloutcleanup.started.v1"
+  | "keda.scaledjob.rolloutcleanup.completed.v1"
+  | "keda.scaledjob.rolloutcleanup.failed.v1"
+  | "keda.authentication.triggerauthentication.created.v1"
+  | "keda.authentication.triggerauthentication.updated.v1"
+  | "keda.authentication.triggerauthentication.removed.v1"
+  | "keda.authentication.clustertriggerauthentication.created.v1"
+  | "keda.authentication.clustertriggerauthentication.updated.v1"
+  | "keda.authentication.clustertriggerauthentication.removed.v1";
+
+// cloudeventsource_types.go
+
+export interface CloudEventHTTP {
+  uri: string;
+}
+
+export interface AzureEventGridTopicSpec {
+  endpoint: string;
+}
+
+/**
+ * Where the events go. The Go fields are pointers with no `omitempty`, so the
+ * API stores the destination that is not set as `null`.
+ */
+export interface Destination {
+  http?: CloudEventHTTP | null;
+  azureEventGridTopic?: AzureEventGridTopicSpec | null;
+}
+
+/**
+ * The filter of the events: the included types, all of them when there are
+ * none, without the excluded ones.
+ */
+export interface EventSubscription {
+  includedEventTypes?: CloudEventType[];
+  excludedEventTypes?: CloudEventType[];
+}
+
+/**
+ * The spec of a CloudEventSource and of a ClusterCloudEventSource, which
+ * share it, as their Go types do.
+ */
+export interface CloudEventSourceSpec {
+  clusterName?: string;
+  destination: Destination;
+  authenticationRef?: AuthenticationRef;
+  eventSubscription?: EventSubscription;
+}
+
+export interface CloudEventSourceStatus {
+  conditions?: KedaCondition[];
+}

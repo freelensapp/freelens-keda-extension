@@ -46,18 +46,31 @@ const fixturesDir = path.join(extensionDir, "integration", "fixtures");
 // release the types of the extension follow ("Types" in AGENTS.md).
 export const kedaVersion = process.env.TEST_KEDA_VERSION || "v2.21.0";
 
-// The version of the four kinds, the only one KEDA 2.x serves.
+// The version of the four kinds of keda.sh, the only one KEDA 2.x serves.
 export const kedaApiVersion = "keda.sh/v1alpha1";
 
-// The plurals of the four kinds the extension presents. The session applies
-// their CRDs from the sources of the release, and no controller: the views
-// read the API, and the test objects need no reconciliation.
-const crdPlurals = ["scaledobjects", "scaledjobs", "triggerauthentications", "clustertriggerauthentications"];
+// The version of the two kinds of eventing.keda.sh.
+export const eventingApiVersion = "eventing.keda.sh/v1alpha1";
 
-const crdName = (plural: string) => `${plural}.keda.sh`;
+// The CRDs of the six kinds the extension presents, each `<plural>.<group>`.
+// The session applies them from the sources of the release, and no
+// controller: the views read the API, and the test objects need no
+// reconciliation.
+const crdNames = [
+  "scaledobjects.keda.sh",
+  "scaledjobs.keda.sh",
+  "triggerauthentications.keda.sh",
+  "clustertriggerauthentications.keda.sh",
+  "cloudeventsources.eventing.keda.sh",
+  "clustercloudeventsources.eventing.keda.sh",
+];
 
-const crdUrl = (plural: string) =>
-  `https://raw.githubusercontent.com/kedacore/keda/${kedaVersion}/config/crd/bases/keda.sh_${plural}.yaml`;
+// The file of a CRD in the sources is named `<group>_<plural>.yaml`.
+const crdUrl = (name: string) => {
+  const [plural, ...group] = name.split(".");
+
+  return `https://raw.githubusercontent.com/kedacore/keda/${kedaVersion}/config/crd/bases/${group.join(".")}_${plural}.yaml`;
+};
 
 // The package name with `@` dropped and `/` turned into `--`
 // (`sanitizeExtensionName` in Freelens's `lens-extension.ts`).
@@ -697,11 +710,11 @@ function kubectl(...args: string[]): string {
 }
 
 /**
- * Deletes the CRDs of the four kinds, and with them every object of theirs,
- * the cluster-scoped test object included.
+ * Deletes the CRDs of the six kinds, and with them every object of theirs,
+ * the cluster-scoped test objects included.
  */
 function deleteKedaCrds() {
-  kubectl("delete", "crd", ...crdPlurals.map(crdName), "--ignore-not-found", "--wait");
+  kubectl("delete", "crd", ...crdNames, "--ignore-not-found", "--wait");
 }
 
 /**
@@ -722,7 +735,7 @@ export function setUpCluster() {
     "--force-conflicts",
     "-o",
     "name",
-    ...crdPlurals.flatMap((plural) => ["-f", crdUrl(plural)]),
+    ...crdNames.flatMap((name) => ["-f", crdUrl(name)]),
   )
     .trim()
     .split("\n");
@@ -850,14 +863,24 @@ export function detailsItemValue(frame: Frame, itemName: string): Locator {
 
 /**
  * The value of a field of a trigger in the open details drawer: the cell of
- * its row in the table of the extension's Triggers item. The host shows a
- * printer column named Triggers too, which has no table.
+ * its row in the table of the extension's Trigger Details item.
  */
 export function triggerFieldValue(frame: Frame, fieldName: string): Locator {
-  return detailsItemValue(frame, "Triggers")
+  return detailsItemValue(frame, "Trigger Details")
     .locator("tr")
     .filter({ has: frame.locator("th").getByText(fieldName, { exact: true }) })
     .locator("td");
+}
+
+/**
+ * The row of an object in the Related Objects table of the open details
+ * drawer, by what the object is to the one of the drawer: Scale Target, or the
+ * parameter an authentication resolves.
+ */
+export function relatedObjectRow(frame: Frame, role: string): Locator {
+  return detailsDrawer(frame)
+    .locator("tr")
+    .filter({ has: frame.locator("th").getByText(role, { exact: true }) });
 }
 
 /**
@@ -928,6 +951,17 @@ export async function waitForMenuItem(menu: Locator, title: string) {
 export async function clickMenuItem(frame: Frame, menu: Locator, title: string) {
   await menu.locator(".MenuItem .title").getByText(title, { exact: true }).click();
   await dismissNotifications(frame);
+}
+
+/**
+ * Types into the input of the confirmation dialog that a menu item opened, in
+ * place of what it holds.
+ */
+export async function fillDialogInput(frame: Frame, value: string) {
+  const input = frame.getByTestId("confirmation-dialog").locator("input");
+
+  await input.waitFor(viewTimeout);
+  await input.fill(value);
 }
 
 /**

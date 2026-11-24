@@ -1,0 +1,14 @@
+# The cluster-scoped kind, here without the excluded types. An object sets
+# the included types or the excluded ones, not both. As for the
+# CloudEventSource, no receiver listens at the address.
+apiVersion: eventing.keda.sh/v1alpha1
+kind: ClusterCloudEventSource
+metadata:
+  name: example-cluster-events
+spec:
+  destination:
+    http:
+      uri: http://example-receiver.default.svc.cluster.local:8080
+  eventSubscription:
+    excludedEventTypes:
+    - keda.scaledjob.ready.v1

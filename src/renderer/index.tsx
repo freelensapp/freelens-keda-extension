@@ -4,6 +4,8 @@
  */
 
 import { Renderer } from "@freelensapp/extensions";
+import { CloudEventSource } from "./api/cloudeventsource/cloudeventsource-v1alpha1";
+import { ClusterCloudEventSource } from "./api/clustercloudeventsource/clustercloudeventsource-v1alpha1";
 import { ClusterTriggerAuthentication } from "./api/clustertriggerauthentication/clustertriggerauthentication-v1alpha1";
 import { ScaledJob } from "./api/scaledjob/scaledjob-v1alpha1";
 import { ScaledObject } from "./api/scaledobject/scaledobject-v1alpha1";
@@ -14,18 +16,20 @@ import {
   withMenuItemErrorBoundary,
   withPageErrorBoundary,
 } from "./components/error-boundary";
+import { CloudEventSourceDetails } from "./details/cloud-event-source-details";
 import { ScaledJobDetails } from "./details/scaled-job-details";
 import { ScaledObjectDetails } from "./details/scaled-object-details";
 import { TriggerAuthenticationDetails } from "./details/trigger-authentication-details";
 import { KedaIcon } from "./icons";
 import { PauseMenuItem } from "./menus/pause-menu-item";
+import { CloudEventSourcesPage, ClusterCloudEventSourcesPage } from "./pages/cloud-event-sources-page";
 import { ScaledJobsPage } from "./pages/scaled-jobs-page";
 import { ScaledObjectsPage } from "./pages/scaled-objects-page";
 import { ClusterTriggerAuthenticationsPage, TriggerAuthenticationsPage } from "./pages/trigger-authentications-page";
 
-// Every kind serves a single API version, keda.sh/v1alpha1. The pages still go through createAvailableVersionPage so
-// that each of them shows the "Not Available" page when the CRD is not installed in the cluster, and follows the
-// host's API registry as it loads.
+// Every kind serves a single API version, v1alpha1 of keda.sh or of eventing.keda.sh. The pages still go through
+// createAvailableVersionPage so that each of them shows the "Not Available" page when the CRD is not installed in the
+// cluster, and follows the host's API registry as it loads.
 const ScaledObjectsPageAvailable = createAvailableVersionPage("Scaled Objects", [
   { kubeObjectClass: ScaledObject, PageComponent: ScaledObjectsPage, version: "v1alpha1" },
 ]);
@@ -44,6 +48,14 @@ const ClusterTriggerAuthenticationsPageAvailable = createAvailableVersionPage("C
     PageComponent: ClusterTriggerAuthenticationsPage,
     version: "v1alpha1",
   },
+]);
+
+const CloudEventSourcesPageAvailable = createAvailableVersionPage("Cloud Event Sources", [
+  { kubeObjectClass: CloudEventSource, PageComponent: CloudEventSourcesPage, version: "v1alpha1" },
+]);
+
+const ClusterCloudEventSourcesPageAvailable = createAvailableVersionPage("Cluster Cloud Event Sources", [
+  { kubeObjectClass: ClusterCloudEventSource, PageComponent: ClusterCloudEventSourcesPage, version: "v1alpha1" },
 ]);
 
 // Every page, details panel and menu item renders inside an error boundary, so that an error it throws stays in its
@@ -74,6 +86,18 @@ export default class KedaRenderer extends Renderer.LensExtension {
       id: "cluster-trigger-authentications",
       components: {
         Page: () => <ClusterTriggerAuthenticationsPageAvailable extension={this} />,
+      },
+    },
+    {
+      id: "cloud-event-sources",
+      components: {
+        Page: () => <CloudEventSourcesPageAvailable extension={this} />,
+      },
+    },
+    {
+      id: "cluster-cloud-event-sources",
+      components: {
+        Page: () => <ClusterCloudEventSourcesPageAvailable extension={this} />,
       },
     },
   ].map((registration) => withPageErrorBoundary(this, registration));
@@ -116,21 +140,44 @@ export default class KedaRenderer extends Renderer.LensExtension {
       target: { pageId: "cluster-trigger-authentications" },
       components: {},
     },
+    {
+      id: "cloud-event-sources",
+      parentId: "keda",
+      title: CloudEventSource.crd.title,
+      target: { pageId: "cloud-event-sources" },
+      components: {},
+    },
+    {
+      id: "cluster-cloud-event-sources",
+      parentId: "keda",
+      title: ClusterCloudEventSource.crd.title,
+      target: { pageId: "cluster-cloud-event-sources" },
+      components: {},
+    },
   ];
 
   // Every kind has a page of its own, so the host leaves all of them out of the Custom Resources tree of the cluster
-  // sidebar, where they would otherwise be listed a second time under keda.sh.
-  customResources = [ScaledObject, ScaledJob, TriggerAuthentication, ClusterTriggerAuthentication];
+  // sidebar, where they would otherwise be listed a second time under keda.sh and eventing.keda.sh.
+  customResources = [
+    ScaledObject,
+    ScaledJob,
+    TriggerAuthentication,
+    ClusterTriggerAuthentication,
+    CloudEventSource,
+    ClusterCloudEventSource,
+  ];
 
   // The helpers take `kind` and `apiVersions` from the model class and type the props of the panel and the item from
   // it, so a panel or an item written for another kind fails the type check. TriggerAuthenticationDetails takes the
-  // union of the two authentication models and serves both registrations, as PauseMenuItem does for the two kinds
-  // that take the pause annotation.
+  // union of the two authentication models and serves both registrations, as CloudEventSourceDetails does for the two
+  // event source models, and PauseMenuItem for the two kinds that take the pause annotation.
   kubeObjectDetailItems: Renderer.LensExtension["kubeObjectDetailItems"] = [
     Renderer.K8sApi.detailsFor(ScaledObject, { priority: 10, Details: ScaledObjectDetails }),
     Renderer.K8sApi.detailsFor(ScaledJob, { priority: 10, Details: ScaledJobDetails }),
     Renderer.K8sApi.detailsFor(TriggerAuthentication, { priority: 10, Details: TriggerAuthenticationDetails }),
     Renderer.K8sApi.detailsFor(ClusterTriggerAuthentication, { priority: 10, Details: TriggerAuthenticationDetails }),
+    Renderer.K8sApi.detailsFor(CloudEventSource, { priority: 10, Details: CloudEventSourceDetails }),
+    Renderer.K8sApi.detailsFor(ClusterCloudEventSource, { priority: 10, Details: CloudEventSourceDetails }),
   ].map((registration) => withDetailsErrorBoundary(this, registration));
 
   kubeObjectMenuItems: Renderer.LensExtension["kubeObjectMenuItems"] = [
