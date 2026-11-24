@@ -19,8 +19,7 @@ the metrics of the systems it reads from, down to zero and back up.
 The extension lives in the cluster sidebar under **KEDA**: **Scaled Objects**,
 **Scaled Jobs**, **Trigger Authentications** and **Cluster Trigger
 Authentications**, with the columns of `kubectl get`. Each kind has a details
-panel with its triggers, its authentication parameters and its scaling events,
-and the menu of a ScaledObject or a ScaledJob pauses, scales to zero or resumes
+panel with its triggers and its authentication parameters, and the menu of a ScaledObject or a ScaledJob pauses, scales to zero or resumes
 its autoscaling.
 
 [Video Demo](https://github.com/user-attachments/assets/42545139-f432-4023-886c-cfa76d9db695)
@@ -60,9 +59,7 @@ cluster sidebar, so each of them is listed once, under KEDA.
 
 ## Permissions
 
-The pages list and watch the four kinds, and the details panels read the
-events of an object from the events Freelens already loads. The menu items of
-a ScaledObject or a ScaledJob patch its annotations, so they need `patch` on
+The pages list and watch the four kinds. The menu items of a ScaledObject or a ScaledJob patch its annotations, so they need `patch` on
 `scaledobjects` or `scaledjobs` in its namespace; without it, Freelens shows
 the error of the patch. Nothing else writes to the cluster.
 
@@ -135,8 +132,8 @@ triggers are there for the links between the objects, and resolve without any
 outside system.
 
 Open the cluster in Freelens. The KEDA pages list the objects; the details of a
-ScaledObject or a ScaledJob show its triggers, and its scaling events fill in
-as the controller reconciles it. The details of `example-auth` link to its
+ScaledObject or a ScaledJob show its triggers, and Freelens lists its events
+below them as the controller reconciles it. The details of `example-auth` link to its
 Secret and to `example-job`. Then open the menu of a ScaledObject and choose
 **Pause Autoscaling** or **Scale to Zero**: the Status column turns to `Paused`
 once the controller applies the annotation, and **Resume Autoscaling** brings
@@ -173,7 +170,7 @@ any custom resource: the printer columns of its CRD, its conditions and its
 events.
 
 - **ScaledObject**: the polling interval, the cooldown period, the idle replica count, the initial cooldown period, the
-  `advanced` options (restore to original, scaling modifiers), the fallback and
+  `advanced` options (restore to original, scaling modifiers), the fallback replicas and
   the health of each metric it counts, the external metric names, the original
   replica count and the last active time.
 - **ScaledJob**: the containers and the limits of the Jobs it creates, the
@@ -192,19 +189,14 @@ events.
   define, a Job that failed. The HorizontalPodAutoscaler of a paused object is
   not marked: the controller removes it. The table is read when the details
   open and again when the object changes.
-- **Triggers**, for both: one section per scaler, with its type and its name
+- **Trigger Details**, for both: one section per scaler, with its type and its name
   over a table of its metric type, its metadata and a link to its
   TriggerAuthentication or ClusterTriggerAuthentication.
-- **Scaling Events**, for both: the events the cluster records for the object,
-  one per scaling decision of KEDA, newest first, up to 20, with their type,
-  reason, message, count and last time. They read both event APIs: KEDA 2.20
-  and older record events through `core/v1`, KEDA 2.21 through
-  `events.k8s.io/v1`.
 - **TriggerAuthentication** and **ClusterTriggerAuthentication**: every
   parameter the scalers get, with where its value comes from (a Secret, a
   ConfigMap, an environment variable, HashiCorp Vault, Azure Key Vault, GCP
   Secret Manager, AWS Secrets Manager or a service account token), the settings
-  of pod identity, Vault, the cloud secret managers, OAuth2 and Azure service
+  of pod identity beyond its provider, Vault, the cloud secret managers, OAuth2 and Azure service
   principals, and, for a TriggerAuthentication, links to the Secrets,
   ConfigMaps and service accounts it names and to the ScaledObjects and
   ScaledJobs that use it.

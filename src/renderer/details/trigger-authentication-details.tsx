@@ -18,12 +18,16 @@ const {
 
 export type TriggerAuthenticationDetailsProps = Renderer.Component.KubeObjectDetailsProps<AnyTriggerAuthentication>;
 
-/** A value followed by the details that are set: `aws (role ARN: arn:..., identity owner: workload)`. */
-function describe(value: string | undefined, details: Record<string, string | undefined>): string {
-  const set = Object.entries(details)
+/** The details that are set: `role ARN: arn:..., identity owner: workload`. */
+const settings = (details: Record<string, string | undefined>): string =>
+  Object.entries(details)
     .filter(([, detail]) => detail)
     .map(([name, detail]) => `${name}: ${detail}`)
     .join(", ");
+
+/** A value followed by the details that are set: `https://vault:8200 (mount: kv, role: keda)`. */
+function describe(value: string | undefined, details: Record<string, string | undefined>): string {
+  const set = settings(details);
   return set ? `${value ?? ""} (${set})` : (value ?? "");
 }
 
@@ -36,8 +40,9 @@ const secretKey = (ref: ValueFromSecret | undefined) =>
  * every parameter with where its value comes from, the settings of each
  * source, and, for a TriggerAuthentication, the objects that use it, as links.
  * The host shows the printer columns of the CRD (pod identity provider, Secret
- * and variable names, Vault address, file path, and the names of the objects
- * that use it).
+ * and variable names, Vault address, the file path of a
+ * ClusterTriggerAuthentication, and the names of the objects that use it), so
+ * the panel leaves out the provider and that file path.
  */
 export const TriggerAuthenticationDetails = observer(({ object }: TriggerAuthenticationDetailsProps) => {
   const { spec } = object;
@@ -49,18 +54,20 @@ export const TriggerAuthenticationDetails = observer(({ object }: TriggerAuthent
   const namespaced = object.kind === "TriggerAuthentication";
   const link = (kind: string, apiVersion: string, name: string) =>
     namespaced ? <LinkToObject object={object} objectRef={{ kind, apiVersion, name }} /> : name;
-  const links = (kind: string, names: string[]) =>
-    names.map((name, index) => (
-      <span key={name}>
-        {index > 0 && ", "}
-        {link(kind, "keda.sh/v1alpha1", name)}
-      </span>
-    ));
 
   const { podIdentity, hashiCorpVault, azureKeyVault, gcpSecretManager, awsSecretManager, oauth2 } = spec;
   const servicePrincipal = spec.azureServicePrincipal;
-  const scaledObjects = getScaledObjectNames(object);
-  const scaledJobs = getScaledJobNames(object);
+  const podIdentitySettings = settings({
+    "identity ID": podIdentity?.identityId,
+    "tenant ID": podIdentity?.identityTenantId,
+    "role ARN": podIdentity?.roleArn,
+    "external ID": podIdentity?.externalID,
+    "identity owner": podIdentity?.identityOwner,
+  });
+  const usedBy = [
+    ...getScaledObjectNames(object).map((name) => ({ kind: "ScaledObject", name })),
+    ...getScaledJobNames(object).map((name) => ({ kind: "ScaledJob", name })),
+  ];
 
   return (
     <>
@@ -88,16 +95,10 @@ export const TriggerAuthenticationDetails = observer(({ object }: TriggerAuthent
           </tbody>
         </table>
       </DrawerItem>
-      <DrawerItem name="Pod Identity" hidden={!podIdentity}>
-        {describe(podIdentity?.provider, {
-          "identity ID": podIdentity?.identityId,
-          "tenant ID": podIdentity?.identityTenantId,
-          "role ARN": podIdentity?.roleArn,
-          "external ID": podIdentity?.externalID,
-          "identity owner": podIdentity?.identityOwner,
-        })}
+      <DrawerItem name="Pod Identity Settings" hidden={!podIdentitySettings}>
+        {podIdentitySettings}
       </DrawerItem>
-      <DrawerItem name="File Path" hidden={!spec.filePath}>
+      <DrawerItem name="File Path" hidden={!namespaced || !spec.filePath}>
         {spec.filePath}
       </DrawerItem>
       <DrawerItem name="HashiCorp Vault" hidden={!hashiCorpVault}>
@@ -142,11 +143,17 @@ export const TriggerAuthenticationDetails = observer(({ object }: TriggerAuthent
           cloud: servicePrincipal?.cloud,
         })}
       </DrawerItem>
-      <DrawerItem name="Used by Scaled Objects" hidden={!namespaced || scaledObjects.length === 0}>
-        {links("ScaledObject", scaledObjects)}
-      </DrawerItem>
-      <DrawerItem name="Used by Scaled Jobs" hidden={!namespaced || scaledJobs.length === 0}>
-        {links("ScaledJob", scaledJobs)}
+      <DrawerItem name="Used By" hidden={!namespaced || usedBy.length === 0}>
+        {usedBy.map(({ kind, name }, index) => (
+          <span key={`${kind}/${name}`}>
+            {index > 0 && ", "}
+            <LinkToObject
+              object={object}
+              objectRef={{ kind, apiVersion: "keda.sh/v1alpha1", name }}
+              content={`${kind}/${name}`}
+            />
+          </span>
+        ))}
       </DrawerItem>
     </>
   );
