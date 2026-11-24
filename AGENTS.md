@@ -93,10 +93,10 @@ src/
   renderer/api/types.ts              # KEDA spec and status types
   renderer/api/status-helpers.ts     # Conditions, status lists and the pause annotation, for ScaledObject and ScaledJob
   renderer/api/trigger-authentication.ts # The logic of both trigger authentication kinds, and their parameters
-  renderer/api/events.ts             # When an event was last seen, and the newest events, for both event APIs
+  renderer/api/related-objects.ts    # What a ScaledObject or a ScaledJob ties together, with the state of each
   renderer/api/<kind>/<kind>-<version>.ts # Model and KubeApi of a kind, with its tests
   renderer/pages/                    # One list page per kind, both authentication kinds in one file, and their CSS module
-  renderer/details/                  # One panel per kind, one for both authentication kinds, Triggers, ScalingEvents
+  renderer/details/                  # One panel per kind, one for both authentication kinds, Triggers, RelatedObjects
   renderer/menus/                    # PauseMenuItem: Pause and Resume, for ScaledObject and ScaledJob
   renderer/components/               # createAvailableVersionPage, ErrorBoundary and its wrappers, ErrorPage
   renderer/icons/                    # The SVG icon, imported with ?raw, and its component
@@ -355,7 +355,7 @@ gone from the Custom Resources tree.
   printer column of the CRD and the conditions, reasons and messages
   included, and its Events section at the end. A field of a printer column
   comes back in a panel only as more than its value, such as the scale target
-  as a link to the workload.
+  as a row of `RelatedObjects`, with a link to the workload and its replicas.
 - The list pages are configurable, as the host's own lists: every column has
   an `id`, `isConfigurable` turns on the column menu of the table, which hides
   and shows columns, and the host keeps the choice per `tableId`.
@@ -365,28 +365,61 @@ gone from the Custom Resources tree.
 - `clusterPageMenus` has one KEDA group, with the KEDA icon, which opens the
   Scaled Objects page, and one entry per kind under it, by `parentId`.
 - The panels of ScaledObject and ScaledJob share `Triggers`, the list of their
-  scalers, each a badge with its type and its name over a table of its fields,
-  and list the object's core Events, the scaling decisions and errors
-  the controller records, with `ScalingEvents`
-  (`src/renderer/details/scaling-events.tsx`). It reads
-  `Renderer.K8sApi.eventStore.getEventsByObject(object)`, which matches the
-  events by the object's uid; the host loads and watches that store for the
-  Events section it adds at the end of every drawer. When an event was last
-  seen comes from `getEventLastSeen` in `src/renderer/api/events.ts`, as
-  `kubectl get events` reads it: KEDA 2.21 records events through the
-  events.k8s.io/v1 API, which writes `eventTime` and `series` and leaves
-  `lastTimestamp` empty, and older releases through core/v1.
+  scalers, each a badge with its type and its name over a table of its fields.
+  Its item is named Trigger Details, because the host shows the printer column
+  Triggers, the types alone, in the same drawer. The scaling decisions and
+  errors the controller records are the object's Events, which the host lists
+  at the end of every drawer; the panels do not list them again.
+- An item of a panel never has the name of a printer column with other
+  contents: the fallback settings of a ScaledObject are Fallback Replicas, next
+  to the Fallback column, which is the condition, and the panel of the
+  authentication kinds shows the settings of pod identity without its provider,
+  which is the PodIdentity column.
 - A link to another object is `Renderer.Component.LinkToObject`, with an
   `objectRef` of its kind, name and apiVersion and the object of the panel,
   whose namespace it takes: the host finds the API of the kind, one of its own
   or one it registered for a CRD, and links to the details of the object.
-  Nothing loads another store for a link. The ScaledObject panel links its
-  scale target (`getScaleTargetRef`, with the group and version the controller
-  resolves into `status.scaleTargetGVKR`) and its HPA (`getHpaRef`, from
-  `status.hpaName`), and `Triggers` links the authentication of each trigger
+  Nothing loads another store for a link. `RelatedObjects` links the scale
+  target of a ScaledObject (`getScaleTargetRef`, with the group and version the
+  controller resolves into `status.scaleTargetGVKR`) and its HPA (`getHpaRef`,
+  from `status.hpaName`), and `Triggers` links the authentication of each trigger
   (`getAuthenticationObjectRef`). A ClusterTriggerAuthentication names
   Secrets in the namespace of the operator, which the object does not say, and
   is used by objects in any namespace, so its panel shows those names as text.
+- The panels of ScaledObject and ScaledJob end with `RelatedObjects`
+  (`src/renderer/details/related-objects.tsx`), a title and one table of what
+  the object ties together: a row per object, with what it is to the object, a
+  link to it and its state, and the rows of what a trigger and its
+  authentication read indented under the trigger; a trigger that refers to
+  nothing has no row. The rows come from
+  `getRelatedObjects` of `src/renderer/api/related-objects.ts`, which the
+  component calls when the panel opens and again when the uid or the
+  `resourceVersion` of the object changes, which the controller does at every
+  poll of an active object; it has no timer of its own.
+  - An object is looked up through the API the host has for its kind,
+    `Renderer.K8sApi.apiManager.getApiByKind`, one of its own or one it
+    registered for a CRD, so a custom scale target works as a Deployment does.
+    The lookup is a `list` with the field selector `metadata.name=<name>`, not
+    a `get`: a missing object is an empty list, while a `get` fails with a 404,
+    which Chromium logs as an error of the page and the integration tests
+    count. Each object is looked up once per read.
+  - A lookup has three results: the object, `undefined` when it does not
+    exist, which marks the row, and `null` when the kind is not served or the
+    user may not list it, which leaves the row with its link and says nothing.
+  - The controller removes the HPA of a paused ScaledObject (`handlePause` of
+    `controllers/keda/scaledobject_controller.go`) and creates none for an
+    object it rejects, so those rows carry a state, not a mark.
+  - A variable, of a `*FromEnv` key of the trigger's metadata or of `env` of
+    the authentication, is checked against the container the controller reads:
+    the one `envSourceContainerName` or the authentication names, or the
+    first, of the pod template of the scale target or of `jobTargetRef`. A
+    container with `envFrom` takes variables from objects the view does not
+    read, so nothing is said of it.
+  - A ClusterTriggerAuthentication reads its Secrets and ConfigMaps in the
+    namespace of the operator, which the object does not say, so they are
+    named and not looked up.
+  - The Jobs of a ScaledJob are the ones with the label
+    `scaledjob.keda.sh/name`, which the controller sets on them.
 - `Renderer.Component.ConfirmDialog` lays its content out as flex items, so its
   `message` is one element, `<p>...</p>` ("Rules That Fail Silently").
 - The host renders a cluster page with `params` only. A page that needs the
@@ -487,7 +520,7 @@ or not visibly at all.
   name a column and its value what is left of the width, so at the third level
   the value is a few pixels wide and its text wraps letter by letter, which the
   triggers did until 2.0.1. Fields inside an item are rows of a table, as in
-  `Triggers`, the parameters of the authentication kinds and `ScalingEvents`;
+  `Triggers` and the parameters of the authentication kinds;
   `triggers.test.tsx` checks the table.
 - **Every page, details panel and menu item inside an error boundary**
   ("Renderer Components").
@@ -830,7 +863,9 @@ fails on any error logged by either process:
   `autoscaling.keda.sh/paused-replicas` to `0` on the ScaledObject, and, once
   its confirmation is accepted, `autoscaling.keda.sh/paused` to `true` on the
   ScaledJob, both read back with kubectl. Last, the trigger of the ScaledObject shows its
-  fields in a table and links to the details of its TriggerAuthentication.
+  fields in a table and links to the details of its TriggerAuthentication, and
+  the Related Objects of the ScaledObject mark its Deployment, which does not
+  exist, and link the Secret of its authentication.
   Each view opens its page itself;
   the two writes come after the menu checks, which expect the objects not
   paused. They do not check the columns, every field, Resume Autoscaling or the

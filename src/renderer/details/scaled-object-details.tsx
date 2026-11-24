@@ -1,13 +1,13 @@
 import { Renderer } from "@freelensapp/extensions";
 import * as MobxReact from "mobx-react";
 import { ScaledObject } from "../api/scaledobject/scaledobject-v1alpha1";
-import { ScalingEvents } from "./scaling-events";
+import { RelatedObjects } from "./related-objects";
 import { Triggers } from "./triggers";
 
 const { observer } = MobxReact;
 
 const {
-  Component: { DrawerItem, LinkToObject },
+  Component: { DrawerItem },
 } = Renderer;
 
 export type ScaledObjectDetailsProps = Renderer.Component.KubeObjectDetailsProps<ScaledObject>;
@@ -19,27 +19,18 @@ const seconds = (value: number | undefined) => (value === undefined ? "-" : `${v
  * shows the printer columns of the CRD (the kind and name of the scale target,
  * min and max, the Ready, Active, Fallback and Paused conditions, the trigger
  * and authentication types) and the conditions themselves, with their reasons
- * and messages.
+ * and messages, and its events. The Fallback column is the condition, so the
+ * settings of the fallback have a name of their own. The scale target and the
+ * HorizontalPodAutoscaler are rows of `RelatedObjects`, with their state.
  */
 export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProps) => {
   const { spec, status } = object;
-  const hpaRef = ScaledObject.getHpaRef(object);
   const { fallback } = spec;
   const modifiers = spec.advanced?.scalingModifiers;
   const health = Object.entries(status?.health ?? {});
 
   return (
     <>
-      <DrawerItem name="Scale Target">
-        <LinkToObject
-          object={object}
-          objectRef={ScaledObject.getScaleTargetRef(object)}
-          content={ScaledObject.getScaleTarget(object)}
-        />
-      </DrawerItem>
-      <DrawerItem name="Horizontal Pod Autoscaler" hidden={!hpaRef}>
-        <LinkToObject object={object} objectRef={hpaRef} />
-      </DrawerItem>
       <DrawerItem name="Polling Interval">{seconds(spec.pollingInterval)}</DrawerItem>
       <DrawerItem name="Cooldown Period">{seconds(spec.cooldownPeriod)}</DrawerItem>
       <DrawerItem name="Idle Replica Count">{spec.idleReplicaCount ?? "-"}</DrawerItem>
@@ -56,10 +47,9 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
         {modifiers?.metricType ? ` (${modifiers.metricType})` : ""}
       </DrawerItem>
       <Triggers object={object} triggers={spec.triggers ?? []} />
-      <DrawerItem name="Fallback">
-        {fallback
-          ? `${fallback.replicas} replicas after ${fallback.failureThreshold} failures (${fallback.behavior ?? "static"})`
-          : "Disabled"}
+      <DrawerItem name="Fallback Replicas" hidden={!fallback}>
+        {fallback &&
+          `${fallback.replicas} after ${fallback.failureThreshold} failures (${fallback.behavior ?? "static"})`}
       </DrawerItem>
       <DrawerItem name="Health" hidden={health.length === 0}>
         {health
@@ -74,7 +64,7 @@ export const ScaledObjectDetails = observer(({ object }: ScaledObjectDetailsProp
       </DrawerItem>
       <DrawerItem name="Original Replica Count">{status?.originalReplicaCount ?? "-"}</DrawerItem>
       <DrawerItem name="Last Active Time">{status?.lastActiveTime ?? "-"}</DrawerItem>
-      <ScalingEvents object={object} />
+      <RelatedObjects object={object} />
     </>
   );
 });

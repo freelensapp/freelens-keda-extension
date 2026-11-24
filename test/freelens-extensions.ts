@@ -97,6 +97,10 @@ function LinkToObject({ content }: { content?: React.ReactNode }) {
   return React.createElement("a", null, content);
 }
 
+function DrawerTitle({ children }: { children?: React.ReactNode }) {
+  return React.createElement("h3", null, children);
+}
+
 interface KubeObjectListLayoutProps {
   store: { items: unknown[] };
   renderTableContents: (item: unknown) => React.ReactNode[];
@@ -135,6 +139,7 @@ export const Renderer = {
     BadgeBoolean,
     ConfirmDialog,
     DrawerItem,
+    DrawerTitle,
     Icon,
     Input,
     KubeObjectAge,
@@ -150,6 +155,8 @@ export const Renderer = {
     KubeObjectStore: class KubeObjectStore {},
     // Finds no HPA; a test that needs one spies on `get`.
     hpaApi: { get: async (): Promise<unknown> => null },
+    // Knows no kind; a test that needs objects spies on `getApiByKind`.
+    apiManager: { getApiByKind: (): unknown => undefined },
   },
 };
 
