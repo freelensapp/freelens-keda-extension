@@ -19,6 +19,7 @@ import {
   detailsObjectLink,
   disconnectKindCluster,
   expectDetailsApiVersion,
+  fillDialogInput,
   installExtension,
   kedaApiVersion,
   kedaVersion,
@@ -60,7 +61,7 @@ const kindViews: KindView[] = [
     kind: "ScaledObject",
     pageId: "scaled-objects",
     detailsItem: "Polling Interval",
-    menuItems: ["Pause Autoscaling", "Scale to Zero"],
+    menuItems: ["Pause Autoscaling"],
     resource: "scaledobject",
     namespaced: true,
   },
@@ -91,7 +92,7 @@ const kindViews: KindView[] = [
 ];
 
 // The titles of every menu item of the extension, to tell them from the host's.
-const extensionMenuItems = ["Pause Autoscaling", "Scale to Zero", "Resume Autoscaling"];
+const extensionMenuItems = ["Pause Autoscaling", "Resume Autoscaling"];
 
 describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${kedaVersion}`, () => {
   let session: AppSession | undefined;
@@ -157,21 +158,23 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
     expect(titles.filter((title) => extensionMenuItems.includes(title))).toEqual(menuItems);
   });
 
-  it("scales the ScaledObject test object to zero, after asking", async () => {
+  it("pauses the ScaledObject test object at the replicas typed in the dialog, after asking", async () => {
     const row = await openListPage(frame, "scaled-objects");
     const menu = await openRowMenu(frame, row);
 
-    await clickMenuItem(frame, menu, "Scale to Zero");
-    await confirmDialog(frame, "Scale to Zero");
+    await clickMenuItem(frame, menu, "Pause Autoscaling");
+    await fillDialogInput(frame, "0");
+    await confirmDialog(frame, "Pause");
 
     expect(await waitForAnnotation("scaledobject", true, "autoscaling.keda.sh/paused-replicas")).toBe("0");
   });
 
-  it("pauses the autoscaling of the ScaledJob test object", async () => {
+  it("pauses the autoscaling of the ScaledJob test object, after asking", async () => {
     const row = await openListPage(frame, "scaled-jobs");
     const menu = await openRowMenu(frame, row);
 
     await clickMenuItem(frame, menu, "Pause Autoscaling");
+    await confirmDialog(frame, "Pause");
 
     expect(await waitForAnnotation("scaledjob", true, "autoscaling.keda.sh/paused")).toBe("true");
   });

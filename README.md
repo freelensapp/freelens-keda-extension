@@ -19,8 +19,8 @@ the metrics of the systems it reads from, down to zero and back up.
 The extension lives in the cluster sidebar under **KEDA**: **Scaled Objects**,
 **Scaled Jobs**, **Trigger Authentications** and **Cluster Trigger
 Authentications**, with the columns of `kubectl get`. Each kind has a details
-panel with its triggers and its authentication parameters, and the menu of a ScaledObject or a ScaledJob pauses, scales to zero or resumes
-its autoscaling.
+panel with its triggers and its authentication parameters, and the menu of a
+ScaledObject or a ScaledJob pauses or resumes its autoscaling.
 
 [Video Demo](https://github.com/user-attachments/assets/42545139-f432-4023-886c-cfa76d9db695)
 
@@ -135,8 +135,8 @@ Open the cluster in Freelens. The KEDA pages list the objects; the details of a
 ScaledObject or a ScaledJob show its triggers, and Freelens lists its events
 below them as the controller reconciles it. The details of `example-auth` link to its
 Secret and to `example-job`. Then open the menu of a ScaledObject and choose
-**Pause Autoscaling** or **Scale to Zero**: the Status column turns to `Paused`
-once the controller applies the annotation, and **Resume Autoscaling** brings
+**Pause Autoscaling**: it asks for the replicas to keep, and the Status column
+turns to `Paused` once the controller applies the annotation, and **Resume Autoscaling** brings
 the autoscaling back.
 
 ## Features
@@ -206,12 +206,14 @@ events.
 The menus of a ScaledObject and a ScaledJob write the annotations the
 controller reads, the same as `kubectl annotate`:
 
-- **Pause Autoscaling** sets `autoscaling.keda.sh/paused` to `true`, which
-  keeps the target of a ScaledObject at its current replicas (KEDA 2.12 or
-  later) and stops a ScaledJob from creating Jobs.
-- **Scale to Zero**, for a ScaledObject, sets
-  `autoscaling.keda.sh/paused-replicas` to `0`, which scales the target down to
-  zero replicas and keeps it there. It asks first.
+- **Pause Autoscaling** asks first. For a ScaledObject it asks for the number
+  of replicas to keep, with the current ones filled in, and sets
+  `autoscaling.keda.sh/paused-replicas` to it, which scales the target to that
+  number and keeps it there; `0` scales it down to zero. Left empty, it sets
+  `autoscaling.keda.sh/paused` to `true`, which keeps the target at its current
+  replicas (KEDA 2.12 or later). For a ScaledJob, which has no replicas to
+  keep, it sets `autoscaling.keda.sh/paused` to `true`, which stops it from
+  creating Jobs.
 - **Resume Autoscaling** removes both annotations, and the controller scales
   the target again. It is the only item while the object is paused.
 
