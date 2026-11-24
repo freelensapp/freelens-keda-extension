@@ -1,0 +1,41 @@
+// One row per object: what it is to the object, the object, and its state.
+.objects {
+  width: 100%;
+  margin-bottom: 16px;
+  border-collapse: collapse;
+  font-size: 0.9em;
+
+  // The host colors the links of a drawer item only, and the table is not in one.
+  a {
+    color: var(--primary);
+  }
+
+  th,
+  td {
+    padding: 4px 8px;
+    text-align: left;
+    vertical-align: top;
+    border-top: 1px solid var(--borderFaintColor);
+  }
+
+  th {
+    color: var(--textColorTertiary);
+    font-weight: 500;
+  }
+
+  td {
+    word-break: break-word;
+  }
+
+  // What a trigger and its authentication read, under the row of the trigger.
+  .nested {
+    padding-left: 24px;
+  }
+}
+
+.problem {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--colorError);
+}

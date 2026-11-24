@@ -63,6 +63,12 @@ The pages list and watch the four kinds. The menu items of a ScaledObject or a S
 `scaledobjects` or `scaledjobs` in its namespace; without it, Freelens shows
 the error of the patch. Nothing else writes to the cluster.
 
+The Related Objects of a ScaledObject or a ScaledJob look up, by name, the
+objects it refers to in its namespace, which needs `list` on their kinds: the
+scale target, the HorizontalPodAutoscaler, the TriggerAuthentications and the
+Secrets, ConfigMaps and ServiceAccounts they read, and the Jobs of a ScaledJob.
+An object of a kind the user may not list keeps its row, with no state.
+
 ## Install
 
 Open Freelens and go to Extensions (`ctrl`+`shift`+`E` or
@@ -163,15 +169,26 @@ Each kind has a details panel in the drawer, next to what Freelens shows for
 any custom resource: the printer columns of its CRD, its conditions and its
 events.
 
-- **ScaledObject**: links to the workload it scales and to the
-  HorizontalPodAutoscaler the controller created for it, the polling interval,
-  the cooldown period, the idle replica count, the initial cooldown period, the
-  `advanced` options (restore to original, scaling modifiers), the fallback
-  replicas and the health of each metric it counts, the external metric names, the original
+- **ScaledObject**: the polling interval, the cooldown period, the idle replica count, the initial cooldown period, the
+  `advanced` options (restore to original, scaling modifiers), the fallback replicas and
+  the health of each metric it counts, the external metric names, the original
   replica count and the last active time.
 - **ScaledJob**: the containers and the limits of the Jobs it creates, the
   polling interval, the history limits, the rollout and scaling strategies, the
   external metric names and the last active time.
+- **Related Objects**, for both: one table of what the object ties together,
+  each with a link and its state. For a ScaledObject, the workload it scales
+  with its ready and desired replicas, and the HorizontalPodAutoscaler the
+  controller created for it with its current and desired replicas; for a
+  ScaledJob, its Jobs, counted by state, and the newest ten. Then each trigger
+  that has one with its TriggerAuthentication or ClusterTriggerAuthentication, and under it
+  where each of its parameters comes from: a key of a Secret or a ConfigMap, a
+  variable of the workload, a path in a vault. A red mark shows what is
+  missing: a scale target, an authentication, a Secret or a ConfigMap that
+  does not exist, a key that is not in it, a variable the container does not
+  define, a Job that failed. The HorizontalPodAutoscaler of a paused object is
+  not marked: the controller removes it. The table is read when the details
+  open and again when the object changes.
 - **Trigger Details**, for both: one section per scaler, with its type and its name
   over a table of its metric type, its metadata and a link to its
   TriggerAuthentication or ClusterTriggerAuthentication.

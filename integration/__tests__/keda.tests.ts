@@ -27,6 +27,7 @@ import {
   openKindCluster,
   openListPage,
   openRowMenu,
+  relatedObjectRow,
   setUpCluster,
   tearDownCluster,
   testNamespace,
@@ -58,7 +59,7 @@ const kindViews: KindView[] = [
   {
     kind: "ScaledObject",
     pageId: "scaled-objects",
-    detailsItem: "Scale Target",
+    detailsItem: "Polling Interval",
     menuItems: ["Pause Autoscaling", "Scale to Zero"],
     resource: "scaledobject",
     namespaced: true,
@@ -193,6 +194,21 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
 
     expect(await detailsObjectLink(frame)).toBe(
       `/apis/${kedaApiVersion}/namespaces/${testNamespace}/triggerauthentications/${testObjectName}`,
+    );
+  });
+
+  it("shows what the ScaledObject ties together, with a mark on the Deployment that does not exist", async () => {
+    const row = await openListPage(frame, "scaled-objects");
+
+    await openDetails(frame, row, "Triggers");
+
+    const target = relatedObjectRow(frame, "Scale Target").locator("td");
+
+    expect(await target.first().textContent()).toBe(`Deployment/${testObjectName}`);
+    expect(await target.last().textContent()).toContain("Not found");
+    // A link: the Secret of the TriggerAuthentication exists, and has the key.
+    expect(await relatedObjectRow(frame, "connection").locator("a").textContent()).toBe(
+      `Secret/${testObjectName}, key connection`,
     );
   });
 });
