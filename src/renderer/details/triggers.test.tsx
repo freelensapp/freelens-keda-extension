@@ -38,6 +38,8 @@ describe("Triggers", () => {
   it("shows the metric type, the metadata and the authentication of a trigger as rows of one table", () => {
     render(<Triggers object={object} triggers={[rabbitmq]} />);
 
+    // Not "Triggers", the name of the printer column the host shows in the same drawer.
+    expect(screen.getByText("Trigger Details")).toBeTruthy();
     expect(rowsOf(screen.getByRole("table"))).toEqual([
       ["Metric Type", "AverageValue"],
       ["queueName", "orders"],

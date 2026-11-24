@@ -20,6 +20,7 @@ import {
   disconnectKindCluster,
   eventingApiVersion,
   expectDetailsApiVersion,
+  fillDialogInput,
   installExtension,
   kedaApiVersion,
   kedaVersion,
@@ -28,6 +29,7 @@ import {
   openKindCluster,
   openListPage,
   openRowMenu,
+  relatedObjectRow,
   setUpCluster,
   tearDownCluster,
   testNamespace,
@@ -62,8 +64,8 @@ const kindViews: KindView[] = [
     kind: "ScaledObject",
     apiVersion: kedaApiVersion,
     pageId: "scaled-objects",
-    detailsItem: "Scale Target",
-    menuItems: ["Pause Autoscaling", "Scale to Zero"],
+    detailsItem: "Polling Interval",
+    menuItems: ["Pause Autoscaling"],
     resource: "scaledobject",
     namespaced: true,
   },
@@ -115,7 +117,7 @@ const kindViews: KindView[] = [
 ];
 
 // The titles of every menu item of the extension, to tell them from the host's.
-const extensionMenuItems = ["Pause Autoscaling", "Scale to Zero", "Resume Autoscaling"];
+const extensionMenuItems = ["Pause Autoscaling", "Resume Autoscaling"];
 
 describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${kedaVersion}`, () => {
   let session: AppSession | undefined;
@@ -181,21 +183,23 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
     expect(titles.filter((title) => extensionMenuItems.includes(title))).toEqual(menuItems);
   });
 
-  it("scales the ScaledObject test object to zero, after asking", async () => {
+  it("pauses the ScaledObject test object at the replicas typed in the dialog, after asking", async () => {
     const row = await openListPage(frame, "scaled-objects");
     const menu = await openRowMenu(frame, row);
 
-    await clickMenuItem(frame, menu, "Scale to Zero");
-    await confirmDialog(frame, "Scale to Zero");
+    await clickMenuItem(frame, menu, "Pause Autoscaling");
+    await fillDialogInput(frame, "0");
+    await confirmDialog(frame, "Pause");
 
     expect(await waitForAnnotation("scaledobject", true, "autoscaling.keda.sh/paused-replicas")).toBe("0");
   });
 
-  it("pauses the autoscaling of the ScaledJob test object", async () => {
+  it("pauses the autoscaling of the ScaledJob test object, after asking", async () => {
     const row = await openListPage(frame, "scaled-jobs");
     const menu = await openRowMenu(frame, row);
 
     await clickMenuItem(frame, menu, "Pause Autoscaling");
+    await confirmDialog(frame, "Pause");
 
     expect(await waitForAnnotation("scaledjob", true, "autoscaling.keda.sh/paused")).toBe("true");
   });
@@ -203,7 +207,7 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
   it("shows the fields of the trigger of the ScaledObject in a table", async () => {
     const row = await openListPage(frame, "scaled-objects");
 
-    await openDetails(frame, row, "Triggers");
+    await openDetails(frame, row, "Trigger Details");
 
     expect(await triggerFieldValue(frame, "threshold").textContent()).toBe("10");
     expect(await triggerFieldValue(frame, "serverAddress").textContent()).toBe("http://prometheus.monitoring:9090");
@@ -212,12 +216,27 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
   it("links the trigger of the ScaledObject to its TriggerAuthentication", async () => {
     const row = await openListPage(frame, "scaled-objects");
 
-    await openDetails(frame, row, "Triggers");
+    await openDetails(frame, row, "Trigger Details");
     await triggerFieldValue(frame, "Authentication").locator("a").click();
     await waitForDetailsItem(frame, "Parameters");
 
     expect(await detailsObjectLink(frame)).toBe(
       `/apis/${kedaApiVersion}/namespaces/${testNamespace}/triggerauthentications/${testObjectName}`,
+    );
+  });
+
+  it("shows what the ScaledObject ties together, with a mark on the Deployment that does not exist", async () => {
+    const row = await openListPage(frame, "scaled-objects");
+
+    await openDetails(frame, row, "Triggers");
+
+    const target = relatedObjectRow(frame, "Scale Target").locator("td");
+
+    expect(await target.first().textContent()).toBe(`Deployment/${testObjectName}`);
+    expect(await target.last().textContent()).toContain("Not found");
+    // A link: the Secret of the TriggerAuthentication exists, and has the key.
+    expect(await relatedObjectRow(frame, "connection").locator("a").textContent()).toBe(
+      `Secret/${testObjectName}, key connection`,
     );
   });
 });

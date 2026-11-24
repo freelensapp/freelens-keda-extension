@@ -20,9 +20,8 @@ The extension lives in the cluster sidebar under **KEDA**: **Scaled Objects**,
 **Scaled Jobs**, **Trigger Authentications**, **Cluster Trigger
 Authentications**, **Cloud Event Sources** and **Cluster Cloud Event Sources**,
 with the columns of `kubectl get`. Each kind has a details
-panel with its triggers, its authentication parameters and its scaling events,
-and the menu of a ScaledObject or a ScaledJob pauses, scales to zero or resumes
-its autoscaling.
+panel with its triggers and its authentication parameters, and the menu of a
+ScaledObject or a ScaledJob pauses or resumes its autoscaling.
 
 [Video Demo](https://github.com/user-attachments/assets/42545139-f432-4023-886c-cfa76d9db695)
 
@@ -64,11 +63,16 @@ cluster sidebar, so each of them is listed once, under KEDA.
 
 ## Permissions
 
-The pages list and watch the six kinds, and the details panels read the
-events of an object from the events Freelens already loads. The menu items of
-a ScaledObject or a ScaledJob patch its annotations, so they need `patch` on
+The pages list and watch the six kinds. The menu items of a ScaledObject or a
+ScaledJob patch its annotations, so they need `patch` on
 `scaledobjects` or `scaledjobs` in its namespace; without it, Freelens shows
 the error of the patch. Nothing else writes to the cluster.
+
+The Related Objects of a ScaledObject or a ScaledJob look up, by name, the
+objects it refers to in its namespace, which needs `list` on their kinds: the
+scale target, the HorizontalPodAutoscaler, the TriggerAuthentications and the
+Secrets, ConfigMaps and ServiceAccounts they read, and the Jobs of a ScaledJob.
+An object of a kind the user may not list keeps its row, with no state.
 
 ## Install
 
@@ -143,11 +147,11 @@ triggers are there for the links between the objects, and resolve without any
 outside system.
 
 Open the cluster in Freelens. The KEDA pages list the objects; the details of a
-ScaledObject or a ScaledJob show its triggers, and its scaling events fill in
-as the controller reconciles it. The details of `example-auth` link to its
+ScaledObject or a ScaledJob show its triggers, and Freelens lists its events
+below them as the controller reconciles it. The details of `example-auth` link to its
 Secret and to `example-job`. Then open the menu of a ScaledObject and choose
-**Pause Autoscaling** or **Scale to Zero**: the Status column turns to `Paused`
-once the controller applies the annotation, and **Resume Autoscaling** brings
+**Pause Autoscaling**: it asks for the replicas to keep, and the Status column
+turns to `Paused` once the controller applies the annotation, and **Resume Autoscaling** brings
 the autoscaling back.
 
 ## Features
@@ -184,28 +188,34 @@ Each kind has a details panel in the drawer, next to what Freelens shows for
 any custom resource: the printer columns of its CRD, its conditions and its
 events.
 
-- **ScaledObject**: links to the workload it scales and to the
-  HorizontalPodAutoscaler the controller created for it, the polling interval,
-  the cooldown period, the idle replica count, the initial cooldown period, the
-  `advanced` options (restore to original, scaling modifiers), the fallback and
+- **ScaledObject**: the polling interval, the cooldown period, the idle replica count, the initial cooldown period, the
+  `advanced` options (restore to original, scaling modifiers), the fallback replicas and
   the health of each metric it counts, the external metric names, the original
   replica count and the last active time.
 - **ScaledJob**: the containers and the limits of the Jobs it creates, the
   polling interval, the history limits, the rollout and scaling strategies, the
   external metric names and the last active time.
-- **Triggers**, for both: one section per scaler, with its type and its name
+- **Related Objects**, for both: one table of what the object ties together,
+  each with a link and its state. For a ScaledObject, the workload it scales
+  with its ready and desired replicas, and the HorizontalPodAutoscaler the
+  controller created for it with its current and desired replicas; for a
+  ScaledJob, its Jobs, counted by state, and the newest ten. Then each trigger
+  that has one with its TriggerAuthentication or ClusterTriggerAuthentication, and under it
+  where each of its parameters comes from: a key of a Secret or a ConfigMap, a
+  variable of the workload, a path in a vault. A red mark shows what is
+  missing: a scale target, an authentication, a Secret or a ConfigMap that
+  does not exist, a key that is not in it, a variable the container does not
+  define, a Job that failed. The HorizontalPodAutoscaler of a paused object is
+  not marked: the controller removes it. The table is read when the details
+  open and again when the object changes.
+- **Trigger Details**, for both: one section per scaler, with its type and its name
   over a table of its metric type, its metadata and a link to its
   TriggerAuthentication or ClusterTriggerAuthentication.
-- **Scaling Events**, for both: the events the cluster records for the object,
-  one per scaling decision of KEDA, newest first, up to 20, with their type,
-  reason, message, count and last time. They read both event APIs: KEDA 2.20
-  and older record events through `core/v1`, KEDA 2.21 through
-  `events.k8s.io/v1`.
 - **TriggerAuthentication** and **ClusterTriggerAuthentication**: every
   parameter the scalers get, with where its value comes from (a Secret, a
   ConfigMap, an environment variable, HashiCorp Vault, Azure Key Vault, GCP
   Secret Manager, AWS Secrets Manager or a service account token), the settings
-  of pod identity, Vault, the cloud secret managers, OAuth2 and Azure service
+  of pod identity beyond its provider, Vault, the cloud secret managers, OAuth2 and Azure service
   principals, and, for a TriggerAuthentication, links to the Secrets,
   ConfigMaps and service accounts it names and to the ScaledObjects and
   ScaledJobs that use it.
@@ -219,12 +229,14 @@ events.
 The menus of a ScaledObject and a ScaledJob write the annotations the
 controller reads, the same as `kubectl annotate`:
 
-- **Pause Autoscaling** sets `autoscaling.keda.sh/paused` to `true`, which
-  keeps the target of a ScaledObject at its current replicas (KEDA 2.12 or
-  later) and stops a ScaledJob from creating Jobs.
-- **Scale to Zero**, for a ScaledObject, sets
-  `autoscaling.keda.sh/paused-replicas` to `0`, which scales the target down to
-  zero replicas and keeps it there. It asks first.
+- **Pause Autoscaling** asks first. For a ScaledObject it asks for the number
+  of replicas to keep, with the current ones filled in, and sets
+  `autoscaling.keda.sh/paused-replicas` to it, which scales the target to that
+  number and keeps it there; `0` scales it down to zero. Left empty, it sets
+  `autoscaling.keda.sh/paused` to `true`, which keeps the target at its current
+  replicas (KEDA 2.12 or later). For a ScaledJob, which has no replicas to
+  keep, it sets `autoscaling.keda.sh/paused` to `true`, which stops it from
+  creating Jobs.
 - **Resume Autoscaling** removes both annotations, and the controller scales
   the target again. It is the only item while the object is paused.
 
