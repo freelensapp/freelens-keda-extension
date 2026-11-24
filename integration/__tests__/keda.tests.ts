@@ -18,6 +18,7 @@ import {
   connectApp,
   detailsObjectLink,
   disconnectKindCluster,
+  eventingApiVersion,
   expectDetailsApiVersion,
   fillDialogInput,
   installExtension,
@@ -45,6 +46,8 @@ import type { AppSession } from "./extension-helpers";
 
 interface KindView {
   kind: string;
+  /** The group and version the details show the test object in. */
+  apiVersion: string;
   /** The `id` of the kind's `clusterPages` registration. */
   pageId: string;
   /** An item that the extension's details panel shows for the test object. */
@@ -59,6 +62,7 @@ interface KindView {
 const kindViews: KindView[] = [
   {
     kind: "ScaledObject",
+    apiVersion: kedaApiVersion,
     pageId: "scaled-objects",
     detailsItem: "Polling Interval",
     menuItems: ["Pause Autoscaling"],
@@ -67,6 +71,7 @@ const kindViews: KindView[] = [
   },
   {
     kind: "ScaledJob",
+    apiVersion: kedaApiVersion,
     pageId: "scaled-jobs",
     detailsItem: "Job Containers",
     menuItems: ["Pause Autoscaling"],
@@ -75,6 +80,7 @@ const kindViews: KindView[] = [
   },
   {
     kind: "TriggerAuthentication",
+    apiVersion: kedaApiVersion,
     pageId: "trigger-authentications",
     detailsItem: "Parameters",
     menuItems: [],
@@ -83,10 +89,29 @@ const kindViews: KindView[] = [
   },
   {
     kind: "ClusterTriggerAuthentication",
+    apiVersion: kedaApiVersion,
     pageId: "cluster-trigger-authentications",
     detailsItem: "Parameters",
     menuItems: [],
     resource: "clustertriggerauthentication",
+    namespaced: false,
+  },
+  {
+    kind: "CloudEventSource",
+    apiVersion: eventingApiVersion,
+    pageId: "cloud-event-sources",
+    detailsItem: "Destination",
+    menuItems: [],
+    resource: "cloudeventsource",
+    namespaced: true,
+  },
+  {
+    kind: "ClusterCloudEventSource",
+    apiVersion: eventingApiVersion,
+    pageId: "cluster-cloud-event-sources",
+    detailsItem: "Destination",
+    menuItems: [],
+    resource: "clustercloudeventsource",
     namespaced: false,
   },
 ];
@@ -138,11 +163,11 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
     await openListPage(frame, pageId);
   });
 
-  it.each(kindViews)("shows the details of the $kind test object", async ({ pageId, detailsItem }) => {
+  it.each(kindViews)("shows the details of the $kind test object", async ({ apiVersion, pageId, detailsItem }) => {
     const row = await openListPage(frame, pageId);
 
     await openDetails(frame, row, detailsItem);
-    await expectDetailsApiVersion(frame, kedaApiVersion);
+    await expectDetailsApiVersion(frame, apiVersion);
   });
 
   it.each(kindViews)("shows the extension's menu items for the $kind test object", async ({ pageId, menuItems }) => {
