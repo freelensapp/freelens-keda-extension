@@ -178,7 +178,7 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
   it("shows the fields of the trigger of the ScaledObject in a table", async () => {
     const row = await openListPage(frame, "scaled-objects");
 
-    await openDetails(frame, row, "Triggers");
+    await openDetails(frame, row, "Trigger Details");
 
     expect(await triggerFieldValue(frame, "threshold").textContent()).toBe("10");
     expect(await triggerFieldValue(frame, "serverAddress").textContent()).toBe("http://prometheus.monitoring:9090");
@@ -187,7 +187,7 @@ describe.skipIf(!(await appReady({ cluster: true })))(`KEDA views with KEDA ${ke
   it("links the trigger of the ScaledObject to its TriggerAuthentication", async () => {
     const row = await openListPage(frame, "scaled-objects");
 
-    await openDetails(frame, row, "Triggers");
+    await openDetails(frame, row, "Trigger Details");
     await triggerFieldValue(frame, "Authentication").locator("a").click();
     await waitForDetailsItem(frame, "Parameters");
 
