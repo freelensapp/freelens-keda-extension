@@ -14,6 +14,8 @@ export interface TriggersProps {
   /** The ScaledObject or ScaledJob, whose namespace the link to a TriggerAuthentication takes. */
   object: Renderer.K8sApi.KubeObject;
   triggers: ScaleTriggers[];
+  /** The current value of the triggers that have one, by their index in `triggers`. */
+  values?: ReadonlyMap<number, string>;
 }
 
 /**
@@ -25,11 +27,17 @@ export interface TriggersProps {
  * by letter. The item is not named Triggers: the host shows the printer
  * column of that name, the types alone, in the same drawer.
  */
-export function Triggers({ object, triggers }: TriggersProps) {
+export function Triggers({ object, triggers, values }: TriggersProps) {
   return (
     <DrawerItem name="Trigger Details" hidden={triggers.length === 0}>
       {triggers.map((trigger, index) => {
         const fields: [string, ReactNode][] = [];
+        const value = values?.get(index);
+
+        // First, next to the target the metadata sets below it, such as `threshold` or `value`.
+        if (value !== undefined) {
+          fields.push(["Current Value", value]);
+        }
 
         if (trigger.metricType) {
           fields.push(["Metric Type", trigger.metricType]);

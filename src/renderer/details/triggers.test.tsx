@@ -48,6 +48,17 @@ describe("Triggers", () => {
     ]);
   });
 
+  it("shows the current value of a trigger that has one, first in its table, by the index of the trigger", () => {
+    const cpu: ScaleTriggers = { type: "cpu", metadata: { value: "80" } };
+
+    render(<Triggers object={object} triggers={[cpu, rabbitmq]} values={new Map([[1, "12"]])} />);
+
+    const [cpuTable, rabbitmqTable] = screen.getAllByRole("table");
+
+    expect(rowsOf(cpuTable)).toEqual([["value", "80"]]);
+    expect(rowsOf(rabbitmqTable)[0]).toEqual(["Current Value", "12"]);
+  });
+
   it("shows each trigger with its type and name over a table of its own", () => {
     const cron: ScaleTriggers = { type: "cron", name: "business-hours", metadata: { timezone: "Europe/Rome" } };
 

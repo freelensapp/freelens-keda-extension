@@ -15,12 +15,17 @@ import { vi } from "vitest";
 class LensExtensionKubeObject {
   apiVersion?: string;
   kind?: string;
-  metadata?: { name?: string; namespace?: string; creationTimestamp?: string };
+  metadata?: { name?: string; namespace?: string; uid?: string; creationTimestamp?: string };
   spec?: unknown;
   status?: unknown;
 
   constructor(data: Record<string, unknown> = {}) {
     Object.assign(this, data);
+  }
+
+  // As the host's, the uid.
+  getId() {
+    return this.metadata?.uid ?? "";
   }
 
   // As the host's, from the metadata.
@@ -134,6 +139,8 @@ function Input({
 }
 
 export const Renderer = {
+  // No cluster is active, as in the root frame; a test of a cluster frame spies on `getActiveCluster`.
+  Catalog: { getActiveCluster: (): unknown => undefined },
   Component: {
     Badge,
     BadgeBoolean,
@@ -153,6 +160,17 @@ export const Renderer = {
     LensExtensionKubeObject,
     KubeApi: class KubeApi {},
     KubeObjectStore: class KubeObjectStore {},
+    // Serves nothing; a test that needs a response spies on `get` of the prototype. `forCluster` gives the same
+    // client for any cluster.
+    KubeJsonApi: class KubeJsonApi {
+      static forCluster() {
+        return new KubeJsonApi();
+      }
+
+      async get(): Promise<unknown> {
+        return {};
+      }
+    },
     // Finds no HPA; a test that needs one spies on `get`.
     hpaApi: { get: async (): Promise<unknown> => null },
     // Knows no kind; a test that needs objects spies on `getApiByKind`.
