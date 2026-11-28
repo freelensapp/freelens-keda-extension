@@ -139,6 +139,8 @@ function Input({
 }
 
 export const Renderer = {
+  // No cluster is active, as in the root frame; a test of a cluster frame spies on `getActiveCluster`.
+  Catalog: { getActiveCluster: (): unknown => undefined },
   Component: {
     Badge,
     BadgeBoolean,
@@ -158,8 +160,13 @@ export const Renderer = {
     LensExtensionKubeObject,
     KubeApi: class KubeApi {},
     KubeObjectStore: class KubeObjectStore {},
-    // Serves nothing; a test that needs a response spies on `get` of the prototype.
+    // Serves nothing; a test that needs a response spies on `get` of the prototype. `forCluster` gives the same
+    // client for any cluster.
     KubeJsonApi: class KubeJsonApi {
+      static forCluster() {
+        return new KubeJsonApi();
+      }
+
       async get(): Promise<unknown> {
         return {};
       }

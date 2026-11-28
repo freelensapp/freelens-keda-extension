@@ -39,6 +39,7 @@ export function formatQuantity(quantity: string): string {
  * by the index of the trigger. A trigger whose metric cannot be read is left
  * out: the API is not served, or the user may not read it. Each request makes
  * the metrics server of KEDA ask the scaler, as a poll of the controller does.
+ * Outside a cluster frame there is no cluster to ask, and no value.
  */
 export async function getTriggerValues(object: ScaledObject): Promise<Map<number, string>> {
   const values = new Map<number, string>();
@@ -46,10 +47,14 @@ export async function getTriggerValues(object: ScaledObject): Promise<Map<number
 
   if (names.length === 0) return values;
 
-  // The client of the cluster frame, built as the host builds its own: the frame's origin is the address the proxy
-  // of the host routes to the cluster, under the prefix of the Kubernetes API. Built here, when a panel asks, never
+  // The host's client for a cluster, which knows how its proxy addresses one. A panel renders in a cluster frame,
+  // where the active cluster of the catalog is the cluster of the frame. Asked for here, when a panel reads, never
   // when the module loads.
-  const api = new Renderer.K8sApi.KubeJsonApi({ serverAddress: window.location.origin, apiBase: "/api-kube" });
+  const clusterId = Renderer.Catalog.getActiveCluster()?.id;
+
+  if (!clusterId) return values;
+
+  const api = Renderer.K8sApi.KubeJsonApi.forCluster(clusterId);
   const path = `/apis/external.metrics.k8s.io/v1beta1/namespaces/${object.getNs()}`;
   const query = { labelSelector: `scaledobject.keda.sh/name=${object.getName()}` };
 

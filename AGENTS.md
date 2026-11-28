@@ -402,10 +402,15 @@ gone from the Custom Resources tree.
   cannot be read is left out, so a user who may not read the API sees the
   triggers without a value. An object with no status makes no request, which
   keeps the integration tests, with no controller, free of failed requests.
-  The host exports no client for a path outside a `KubeApi`, so
-  `getTriggerValues` builds a `Renderer.K8sApi.KubeJsonApi` as the host builds
-  its own for a cluster frame, on the frame's origin with the `/api-kube`
-  prefix, when it is called and never when the module loads.
+  The path is outside any `KubeApi`, so the requests go through the host's
+  client for a cluster, `Renderer.K8sApi.KubeJsonApi.forCluster(clusterId)`,
+  with the id of `Renderer.Catalog.getActiveCluster()`: in a cluster frame the
+  active cluster of the catalog is the cluster of the frame, which the host sets
+  before it loads the extensions there. How the Freelens proxy addresses a
+  cluster, the origin of its frame and the `/api-kube` prefix, is the host's to
+  know, so no client is built by hand with them. `getTriggerValues` asks for
+  the client when it is called, never when the module loads, and reads nothing
+  where no cluster is active.
 - A link to another object is `Renderer.Component.LinkToObject`, with an
   `objectRef` of its kind, name and apiVersion and the object of the panel,
   whose namespace it takes: the host finds the API of the kind, one of its own

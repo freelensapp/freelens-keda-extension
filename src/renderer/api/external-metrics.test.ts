@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { Renderer } from "@freelensapp/extensions";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatQuantity, getTriggerIndex, getTriggerValues } from "./external-metrics";
 import { ScaledObject } from "./scaledobject/scaledobject-v1alpha1";
 
@@ -27,6 +27,16 @@ const stubMetrics = (values: Record<string, string>) =>
 
     return { items: [{ metricName: name, value: values[name] }] };
   });
+
+// A details panel renders in a cluster frame, where the active cluster of the catalog is the cluster of the frame.
+const stubActiveCluster = (id?: string) =>
+  vi
+    .spyOn(Renderer.Catalog, "getActiveCluster")
+    .mockReturnValue(id === undefined ? undefined : ({ id } as ReturnType<typeof Renderer.Catalog.getActiveCluster>));
+
+beforeEach(() => {
+  stubActiveCluster("cluster-of-the-frame");
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -76,6 +86,26 @@ describe("getTriggerValues", () => {
     expect(get).toHaveBeenCalledWith("/apis/external.metrics.k8s.io/v1beta1/namespaces/storefront/s2-prometheus", {
       query: { labelSelector: "scaledobject.keda.sh/name=checkout-api" },
     });
+  });
+
+  it("asks the host's client of the cluster of the frame", async () => {
+    const forCluster = vi.spyOn(Renderer.K8sApi.KubeJsonApi, "forCluster");
+
+    stubMetrics({ "s0-prometheus": "3" });
+
+    expect(await getTriggerValues(buildScaledObject(["s0-prometheus"]))).toEqual(new Map([[0, "3"]]));
+    expect(forCluster).toHaveBeenCalledWith("cluster-of-the-frame");
+  });
+
+  it("makes no request where no cluster is active, as outside a cluster frame", async () => {
+    const forCluster = vi.spyOn(Renderer.K8sApi.KubeJsonApi, "forCluster");
+    const get = stubMetrics({ "s0-prometheus": "3" });
+
+    stubActiveCluster(undefined);
+
+    expect(await getTriggerValues(buildScaledObject(["s0-prometheus"]))).toEqual(new Map());
+    expect(forCluster).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
   });
 
   it("leaves out a metric that cannot be read, and keeps the others", async () => {
